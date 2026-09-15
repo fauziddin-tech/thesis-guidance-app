@@ -17,7 +17,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
 <body>
     <nav class="navbar">
         <div class="container">
-            <h1>📚 Bimbingan Skripsi</h1>
+            <h1>Bimbingan Skripsi</h1>
             <ul class="nav-menu">
                 <li><a href="?page=home">Beranda</a></li>
                 <?php if (isset($_SESSION['user'])): ?>
@@ -25,7 +25,7 @@ $page = isset($_GET['page']) ? $_GET['page'] : 'home';
                     <li><a href="?page=logout">Logout</a></li>
                 <?php else: ?>
                     <li><a href="?page=login">Login</a></li>
-                    <li><a href="?page=register">Register</a></li>
+                    <li><a href="?page=register">Daftar</a></li>
                 <?php endif; ?>
             </ul>
         </div>
