@@ -1,0 +1,28 @@
+# Aktifkan mod_rewrite
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    
+    # Arahkan semua request ke index.php kecuali file dan folder yang ada
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php?page=$1 [QSA,L]
+</IfModule>
+
+# Proteksi folder uploads
+<Directory public/uploads>
+    Order Allow,Deny
+    Allow from all
+</Directory>
+
+# Proteksi folder config
+<Directory config>
+    Order Deny,Allow
+    Deny from all
+</Directory>
+
+# Proteksi folder src
+<Directory src>
+    Order Deny,Allow
+    Deny from all
+</Directory>
