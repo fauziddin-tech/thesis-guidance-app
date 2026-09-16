@@ -2,9 +2,9 @@
 // Konfigurasi Database untuk cPanel
 
 define('DB_HOST', 'localhost');
-define('DB_USER', 'your_cpanel_username');
-define('DB_PASS', 'your_database_password');
-define('DB_NAME', 'your_database_name');
+define('DB_USER', 'aulg3645_mythesis');
+define('DB_PASS', 'p@frZIIlXHA60F&c');
+define('DB_NAME', 'aulg3645_mythesis');
 
 // Koneksi ke database
 $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);

@@ -1,11 +1,11 @@
-<?php
+My<?php
 /**
  * Auto-pull deployment script dari GitHub ke cPanel
  * Akses: http://yourdomain.com/deploy.php?token=YOUR_SECRET_TOKEN
  */
 
 // ========== KONFIGURASI ==========
-$secret_token = 'My_Thesis_2026'; // Ganti dengan token unik Anda
+$secret_token = 'mythesis_deploy_secure_2024'; // Ganti dengan token unik Anda
 $repository_path = dirname(__FILE__); // Path ke folder aplikasi
 $branch = 'main'; // Branch yang akan di-pull
 

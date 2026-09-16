@@ -6,7 +6,7 @@
  */
 
 // ========== KONFIGURASI ==========
-$github_secret = 'your_github_webhook_secret'; // Ganti dengan secret dari GitHub
+$github_secret = ''; // Ganti dengan secret dari GitHub
 $repository_path = dirname(__FILE__);
 $branch = 'main';
 

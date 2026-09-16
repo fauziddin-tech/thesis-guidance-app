@@ -36,3 +36,4 @@ thesis-guidance-app/
 ├── schema.sql
 └── index.php
 ```
+# Test deployment

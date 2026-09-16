@@ -1,0 +1,13 @@
+[2026-09-15 22:54:25] === Webhook request diterima ===
+[2026-09-15 22:54:25] ERROR: Signature tidak valid!
+[2026-09-15 22:54:35] === Webhook request diterima ===
+[2026-09-15 22:54:35] ERROR: Signature tidak valid!
+[2026-09-15 22:57:17] === Webhook request diterima ===
+[2026-09-15 22:57:17] ERROR: Signature tidak valid!
+[2026-09-16 09:21:26] === Webhook request diterima ===
+[2026-09-16 09:21:26] Webhook event: push
+[2026-09-16 09:21:26] Menjalankan git pull...
+[2026-09-16 09:21:26] Git output: 
+[2026-09-16 09:21:26] OpCache cleared
+[2026-09-16 09:21:26] === Webhook selesai ===
+[2026-09-16 09:21:26] 
