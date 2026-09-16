@@ -1,4 +1,9 @@
 <?php
+session_start();
+
+// Load required files FIRST
+require_once 'config/database.php';
+require_once 'src/helpers/Functions.php';
 
 $page = isset($_GET['page']) ? sanitize($_GET['page']) : 'home';
 
@@ -16,7 +21,6 @@ $pages = [
 
 // Load page
 if (array_key_exists($page, $pages) && file_exists($pages[$page])) {
-    require_once 'src/helpers/Functions.php';
     require_once $pages[$page];
 } else {
     header('HTTP/1.1 404 Not Found');
