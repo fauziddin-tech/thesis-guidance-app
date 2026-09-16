@@ -11,3 +11,11 @@
 [2026-09-16 09:21:26] OpCache cleared
 [2026-09-16 09:21:26] === Webhook selesai ===
 [2026-09-16 09:21:26] 
+[2026-09-16 09:21:54] === Webhook request diterima ===
+[2026-09-16 09:21:54] Webhook event: push
+[2026-09-16 09:21:54] Pushed branch: main
+[2026-09-16 09:21:54] Menjalankan git pull...
+[2026-09-16 09:21:54] Git output: 
+[2026-09-16 09:21:54] OpCache cleared
+[2026-09-16 09:21:54] === Webhook selesai ===
+[2026-09-16 09:21:54] 
