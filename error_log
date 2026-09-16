@@ -9,3 +9,4 @@
 [15-Sep-2026 22:36:33 Asia/Jakarta] PHP Warning:  mysqli::__construct(): (HY000/1045): Access denied for user 'your_cpanel_username'@'localhost' (using password: YES) in /home/aulg3645/public_html/mythesis/config/database.php on line 10
 [16-Sep-2026 09:21:26 Asia/Jakarta] PHP Warning:  shell_exec() has been disabled for security reasons in /home/aulg3645/public_html/mythesis/deploy-webhook.php on line 72
 [16-Sep-2026 09:21:54 Asia/Jakarta] PHP Warning:  shell_exec() has been disabled for security reasons in /home/aulg3645/public_html/mythesis/deploy-webhook.php on line 72
+[16-Sep-2026 09:26:24 Asia/Jakarta] PHP Warning:  shell_exec() has been disabled for security reasons in /home/aulg3645/public_html/mythesis/deploy-webhook.php on line 72
