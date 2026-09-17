@@ -5,7 +5,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
  verify_csrf();$action=$_POST['action']??'';
  if($action==='create_konsultasi'&&$role==='mahasiswa'){
   $bid=(int)($_POST['bimbingan_id']??0);$topik=trim($_POST['topik']??'');$desc=trim($_POST['deskripsi']??'');$ok=$ctrl->create($uid,$bid,$topik,$desc);
-  if($ok){$s=$conn->prepare('SELECT dosen_id FROM bimbingan WHERE id=?');$s->bind_param('i',$bid);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();if($r)notify_user($conn,(int)$r['dosen_id'],'konsultasi_baru','Ada konsultasi baru dari '.e($u['nama_lengkap']).'.','?page=konsultasi');flash('success','Konsultasi berhasil dikirim.');}else flash('danger','Konsultasi gagal dibuat.');
+  if($ok){$s=$conn->prepare('SELECT dosen_id FROM bimbingan WHERE id=?');$s->bind_param('i',$bid);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();if($r)notify_user($conn,(int)$r['dosen_id'],'konsultasi_baru','Ada konsultasi baru dari '.($u['nama_lengkap']??'mahasiswa').'.','?page=konsultasi');flash('success','Konsultasi berhasil dikirim.');}else flash('danger','Konsultasi gagal dibuat.');
   redirect('?page=konsultasi');
  }
  if($action==='answer_konsultasi'&&$role==='dosen'){
