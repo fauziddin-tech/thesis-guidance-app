@@ -26,7 +26,7 @@ class BimbinganController {
     }
 
     public function getProgress(int $bimbinganId): float {
-        $stmt = $this->conn->prepare("SELECT COUNT(*) AS total FROM bab_skripsi WHERE bimbingan_id = ? AND status = 'disetujui'");
+        $stmt = $this->conn->prepare("SELECT COUNT(DISTINCT nama_bab) AS total FROM bab_skripsi WHERE bimbingan_id = ? AND status = 'disetujui' AND nama_bab IN ('Bab 1','Bab 2','Bab 3','Bab 4','Bab 5')");
         $stmt->bind_param('i', $bimbinganId); $stmt->execute();
         $approved = (int)($stmt->get_result()->fetch_assoc()['total'] ?? 0); $stmt->close();
         return min(100, ($approved / 5) * 100);
