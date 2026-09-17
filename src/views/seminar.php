@@ -1,0 +1,1 @@
+<?php require_login(); ?><div class="page-head"><div><h1>Seminar & Sidang</h1><p class="muted">Jadwal seminar proposal, seminar hasil, dan sidang.</p></div></div><section class="card"><p>Modul seminar sedang disiapkan.</p></section>
