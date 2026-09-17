@@ -20,7 +20,8 @@ class BimbinganController {
     public function getBabSkripsi(int $bimbinganId): array {
         $sql = "SELECT bs.*, COUNT(r.id) AS total_revisi
                 FROM bab_skripsi bs LEFT JOIN revisi r ON r.bab_id = bs.id
-                WHERE bs.bimbingan_id = ? GROUP BY bs.id ORDER BY bs.uploaded_at DESC";
+                WHERE bs.bimbingan_id = ? AND bs.nama_bab IN ('Bab 1','Bab 2','Bab 3','Bab 4','Bab 5')
+                GROUP BY bs.id ORDER BY bs.nama_bab ASC, bs.versi DESC, bs.id DESC";
         $stmt = $this->conn->prepare($sql); $stmt->bind_param('i', $bimbinganId); $stmt->execute();
         $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close(); return $rows;
     }
@@ -41,7 +42,13 @@ class BimbinganController {
 
     public function updateStatus(int $bimbinganId, string $status): array {
         if (!in_array($status, ['aktif','selesai','ditangguhkan'], true)) return ['success'=>false,'error'=>'Status tidak valid.'];
+        if ($status === 'selesai') {
+            $stmt = $this->conn->prepare("SELECT id FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab='Bab 5' AND status='disetujui' ORDER BY versi DESC,id DESC LIMIT 1");
+            $stmt->bind_param('i', $bimbinganId); $stmt->execute();
+            $approved = $stmt->get_result()->num_rows > 0; $stmt->close();
+            if (!$approved) return ['success'=>false,'error'=>'Bimbingan hanya dapat selesai setelah Bab 5 mendapat ACC.'];
+        }
         $stmt = $this->conn->prepare('UPDATE bimbingan SET status = ? WHERE id = ?'); $stmt->bind_param('si',$status,$bimbinganId);
-        $ok=$stmt->execute(); $stmt->close(); return ['success'=>$ok];
+        $ok=$stmt->execute(); $error=$stmt->error; $stmt->close(); return $ok ? ['success'=>true] : ['success'=>false,'error'=>$error];
     }
 }
