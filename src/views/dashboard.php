@@ -42,7 +42,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status='akt
     <input type="hidden" name="action" value="upload_bab"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
     <div class="form-group"><label>Bimbingan</label><select name="bimbingan_id" required><option value="">Pilih bimbingan</option><?php $s=$conn->prepare("SELECT id,judul_skripsi FROM bimbingan WHERE mahasiswa_id=? AND status='aktif' ORDER BY created_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();while($b=$r->fetch_assoc()): ?><option value="<?=$b['id']?>"><?=e($b['judul_skripsi'])?></option><?php endwhile;$s->close(); ?></select></div>
     <div class="form-group"><label>Bab</label><select name="nama_bab" required><option value="">Pilih bab</option><?php for($i=1;$i<=5;$i++): ?><option value="Bab <?=$i?>">Bab <?=$i?></option><?php endfor; ?></select></div>
-    <div class="form-group"><label>File Skripsi</label><input type="file" name="file_bab" accept=".pdf,.doc,.docx" required></div>
+    <div class="form-group"><label>File Skripsi</label><input type="file" name="file" accept=".pdf,.doc,.docx" required></div>
     <button class="btn btn-primary">Unggah Bab</button>
   </form>
 </section>
@@ -63,7 +63,8 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status='akt
   <div class="section-heading"><h2>Review dan Revisi</h2><p class="muted">Pilih versi terbaru yang berstatus Menunggu Review untuk memberikan catatan revisi.</p></div>
   <form method="post">
     <input type="hidden" name="action" value="add_revision"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
-    <div class="form-group"><label>Bab</label><select name="bab_id" required><option value="">Pilih bab</option><?php $s=$conn->prepare("SELECT bs.id,bs.nama_bab,bs.versi,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review' AND bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=bs.bimbingan_id AND x.nama_bab=bs.nama_bab ORDER BY x.versi DESC,x.id DESC LIMIT 1) ORDER BY bs.uploaded_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();while($b=$r->fetch_assoc()): ?><option value="<?=$b['id']?>"><?=e($b['nama_bab'].' v'.$b['versi'].' — '.$b['nama_lengkap'])?></option><?php endwhile;$s->close(); ?></select></div>
+    <div class="form-group"><label>Bab</label><select name="bab_id" required><option value="">Pilih bab</option><?php $s=$conn->prepare("SELECT bs.id,bs.nama_bab,bs.versi,b.id bimbingan_id,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review' AND bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=bs.bimbingan_id AND x.nama_bab=bs.nama_bab ORDER BY x.versi DESC,x.id DESC LIMIT 1) ORDER BY bs.uploaded_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();while($b=$r->fetch_assoc()): ?><option value="<?=$b['id']?>" data-bimbingan-id="<?=$b['bimbingan_id']?>"><?=e($b['nama_bab'].' v'.$b['versi'].' — '.$b['nama_lengkap'])?></option><?php endwhile;$s->close(); ?></select></div>
+    <input type="hidden" name="bimbingan_id" id="revision_bimbingan_id" value="">
     <div class="form-group"><label>Catatan Revisi</label><textarea name="komentar" required placeholder="Tuliskan bagian yang perlu diperbaiki secara jelas"></textarea></div>
     <div class="form-group"><label>Tipe Revisi</label><select name="tipe_revisi"><option value="minor">Minor</option><option value="major">Major</option><option value="kritis">Kritis</option></select></div>
     <button class="btn btn-primary">Kirim Catatan Revisi</button>
@@ -74,4 +75,17 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status='akt
   <div class="section-heading"><h2>Persetujuan Bab</h2><p class="muted">ACC hanya tersedia untuk versi terbaru yang sedang menunggu review.</p></div>
   <?php $s=$conn->prepare("SELECT bs.id,bs.nama_bab,bs.versi,bs.status,b.id bimbingan_id,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='aktif' AND bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=bs.bimbingan_id AND x.nama_bab=bs.nama_bab ORDER BY x.versi DESC,x.id DESC LIMIT 1) ORDER BY bs.uploaded_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();if(!$r->num_rows): ?><div class="empty-state">Belum ada bab untuk diproses.</div><?php else: ?><div class="table-wrap"><table><thead><tr><th>Bab</th><th>Mahasiswa</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($b=$r->fetch_assoc()): ?><tr><td><strong><?=e($b['nama_bab'])?></strong><br><small>Versi <?=e($b['versi'])?></small></td><td><?=e($b['nama_lengkap'])?></td><td><?=getStatusBadge($b['status'])?></td><td><?php if($b['status']==='menunggu_review'): ?><form method="post" class="inline-form"><input type="hidden" name="action" value="approve_bab"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bab_id" value="<?=e($b['id'])?>"><button class="btn btn-success" type="submit">Setujui Bab</button></form><?php elseif($b['status']==='direvisi'): ?><span class="status-note">Menunggu revisi mahasiswa</span><?php elseif($b['status']==='disetujui'): ?><span class="status-note">Sudah disetujui</span><?php else: ?><span class="status-note">-</span><?php endif; ?></td></tr><?php endwhile; ?></tbody></table></div><?php endif;$s->close(); ?>
 </section>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const bab = document.querySelector('select[name="bab_id"]');
+  const target = document.getElementById('revision_bimbingan_id');
+  if (!bab || !target) return;
+  function syncBimbingan() {
+    const option = bab.options[bab.selectedIndex];
+    target.value = option ? (option.dataset.bimbinganId || '') : '';
+  }
+  bab.addEventListener('change', syncBimbingan);
+  syncBimbingan();
+});
+</script>
 <?php endif; ?>
