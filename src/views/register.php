@@ -1,7 +1,8 @@
-<div class="auth-card card"><h1>Buat Akun Mahasiswa</h1><p class="muted">Akun dosen dan admin dibuat oleh administrator.</p>
+<div class="auth-card card"><h1>Buat Akun Mahasiswa</h1><p class="muted">Lengkapi data pendaftaran dan pilih dosen pembimbing yang tersedia di MyThesis.</p>
 <form method="post"><input type="hidden" name="action" value="register"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
 <div class="form-grid"><div class="form-group"><label>Nama Lengkap</label><input name="nama_lengkap" required maxlength="150"></div><div class="form-group"><label>No. Telepon</label><input name="no_telp" maxlength="15"></div></div>
 <div class="form-group"><label>Username</label><input name="username" autocomplete="username" required maxlength="100"></div>
 <div class="form-group"><label>Email</label><input name="email" type="email" autocomplete="email" required maxlength="100"></div>
+<div class="form-group"><label>Dosen Pembimbing</label><select name="dosen_pembimbing_id" required><option value="">Pilih dosen pembimbing</option><?php $dosenList=$conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen' ORDER BY nama_lengkap ASC");while($dosen=$dosenList->fetch_assoc()): ?><option value="<?=e($dosen['id'])?>"><?=e($dosen['nama_lengkap'])?></option><?php endwhile; ?></select><small class="muted">Pilihan ini akan disimpan sebagai dosen pembimbing pilihan Anda.</small></div>
 <div class="form-grid"><div class="form-group"><label>Password</label><input name="password" type="password" autocomplete="new-password" minlength="8" required></div><div class="form-group"><label>Konfirmasi Password</label><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" required></div></div>
 <button class="btn btn-success" type="submit">Daftar</button></form><p class="muted">Sudah punya akun? <a href="?page=login">Masuk</a></p></div>
