@@ -6,8 +6,11 @@ CREATE TABLE IF NOT EXISTS users (
  role ENUM('admin','dosen','mahasiswa') NOT NULL DEFAULT 'mahasiswa',
  nama_lengkap VARCHAR(150) NOT NULL,
  no_telp VARCHAR(20),
+ dosen_pembimbing_id INT NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX idx_users_dosen_pembimbing (dosen_pembimbing_id),
+ FOREIGN KEY (dosen_pembimbing_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS bimbingan (
