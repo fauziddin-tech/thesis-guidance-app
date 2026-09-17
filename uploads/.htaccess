@@ -1,4 +1,9 @@
-Options -Indexes
-<FilesMatch "\.(php|phtml|php[0-9]*)$">
+Options -Indexes -ExecCGI
+
+# Uploaded thesis files are private and must only be streamed by download.php.
+Require all denied
+
+# Defense in depth: never execute script-like uploads.
+<FilesMatch "\.(php|php3|php4|php5|phtml|phar|cgi|pl|py|jsp|asp|aspx)$">
     Require all denied
 </FilesMatch>
