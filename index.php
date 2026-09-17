@@ -1,9 +1,9 @@
 <?php
 session_start();
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/src/helpers/Functions.php';
 $page = $_GET['page'] ?? 'home';
 $action = $_POST['action'] ?? null;
-function e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function redirect(string $url): never { header('Location: ' . $url); exit; }
 function csrf_token(): string { if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32)); return $_SESSION['csrf_token']; }
 function verify_csrf(): void { if (!hash_equals($_SESSION['csrf_token'] ?? '', $_POST['csrf_token'] ?? '')) { http_response_code(419); exit('Permintaan tidak valid. Silakan muat ulang halaman.'); } }
@@ -13,7 +13,7 @@ function flash(string $type,string $message): void { $_SESSION['flash']=['type'=
 function take_flash(): ?array { $f=$_SESSION['flash']??null; unset($_SESSION['flash']); return $f; }
 function notify_user(mysqli $conn,int $userId,string $type,string $message,?string $link=null): void {
     $stmt=$conn->prepare('INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,?,?,?)');
-    $stmt->bind_param('isss',$userId,$type,$message,$link); $stmt->execute(); $stmt->close();
+    if($stmt){$stmt->bind_param('isss',$userId,$type,$message,$link);$stmt->execute();$stmt->close();}
 }
 
 if ($action==='logout') { verify_csrf(); $_SESSION=[]; if(ini_get('session.use_cookies')){ $p=session_get_cookie_params(); setcookie(session_name(),' ',time()-42000,$p['path'],$p['domain'],$p['secure'],$p['httponly']); } session_destroy(); redirect('?page=home'); }
@@ -54,7 +54,7 @@ if($action==='upload_bab'){
  if($file['size']>10*1024*1024){flash('danger','Ukuran file maksimal 10 MB.');redirect('?page=dashboard');}
  $finfo=finfo_open(FILEINFO_MIME_TYPE);$mime=finfo_file($finfo,$file['tmp_name']);finfo_close($finfo);$allowed=['application/pdf'=>'pdf','application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx'];if(!isset($allowed[$mime])){flash('danger','Format file harus PDF, DOC, atau DOCX.');redirect('?page=dashboard');}
  $dir=__DIR__.'/uploads/bab';if(!is_dir($dir) && !mkdir($dir,0750,true) && !is_dir($dir)){flash('danger','Folder upload tidak tersedia.');redirect('?page=dashboard');}$name=bin2hex(random_bytes(16)).'.'.$allowed[$mime];$path=$dir.'/'.$name;if(!move_uploaded_file($file['tmp_name'],$path)){flash('danger','File gagal disimpan.');redirect('?page=dashboard');}
- $stmt=$conn->prepare('SELECT COALESCE(MAX(versi),0)+1 v FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=?');$stmt->bind_param('is',$bid,$nama);$stmt->execute();$versi=(int)$stmt->get_result()->fetch_assoc()['v'];$stmt->close();$relative='uploads/bab/'.$name;$status='menunggu_review';$stmt=$conn->prepare('INSERT INTO bab_skripsi(bimbingan_id,nama_bab,file_path,versi,status) VALUES(?,?,?,?,?)');$stmt->bind_param('issis',$bid,$nama,$relative,$versi,$status);$ok=$stmt->execute();$babId=$conn->insert_id;$stmt->close();if(!$ok)@unlink($path);
+ $stmt=$conn->prepare('SELECT COALESCE(MAX(versi),0)+1 v FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=?');$stmt->bind_param('is',$bid,$nama);$stmt->execute();$versi=(int)$stmt->get_result()->fetch_assoc()['v'];$stmt->close();$relative='uploads/bab/'.$name;$status='menunggu_review';$stmt=$conn->prepare('INSERT INTO bab_skripsi(bimbingan_id,nama_bab,file_path,versi,status) VALUES(?,?,?,?,?)');$stmt->bind_param('issis',$bid,$nama,$relative,$versi,$status);$ok=$stmt->execute();$stmt->close();if(!$ok)@unlink($path);
  if($ok) notify_user($conn,(int)$bim['dosen_id'],'bab_baru','Mahasiswa mengunggah '.$nama.' versi '.$versi.' untuk direview.','?page=bimbingan-detail&id='.$bid);
  flash($ok?'success':'danger',$ok?'Bab berhasil diunggah dan menunggu review dosen.':'Data file gagal disimpan.');redirect('?page=dashboard');
 }
@@ -88,7 +88,6 @@ if($action==='admin_bimbingan_status'){
 if($action==='mark_notification_read'){
  require_login();verify_csrf();$id=(int)($_POST['notification_id']??0);$uid=(int)$_SESSION['user']['id'];$stmt=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE id=? AND user_id=?');$stmt->bind_param('ii',$id,$uid);$stmt->execute();$stmt->close();redirect('?page=notifications');
 }
-
 if($action==='mark_all_notifications_read'){
  require_login();verify_csrf();$uid=(int)$_SESSION['user']['id'];$stmt=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE user_id=?');$stmt->bind_param('i',$uid);$stmt->execute();$stmt->close();redirect('?page=notifications');
 }
