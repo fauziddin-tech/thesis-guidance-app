@@ -62,25 +62,6 @@ CREATE TABLE IF NOT EXISTS konsultasi (
  FOREIGN KEY (jawaban_oleh) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS jadwal_seminar (
- id INT PRIMARY KEY AUTO_INCREMENT,
- bimbingan_id INT NOT NULL,
- tipe_seminar ENUM('proposal','hasil','sidang') NOT NULL,
- tanggal_seminar DATETIME NOT NULL,
- lokasi VARCHAR(150),
- status ENUM('terjadwal','berlangsung','selesai','dibatalkan') DEFAULT 'terjadwal',
- penguji_1 INT NULL,
- penguji_2 INT NULL,
- penguji_3 INT NULL,
- catatan TEXT,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
- FOREIGN KEY (bimbingan_id) REFERENCES bimbingan(id) ON DELETE CASCADE,
- FOREIGN KEY (penguji_1) REFERENCES users(id) ON DELETE SET NULL,
- FOREIGN KEY (penguji_2) REFERENCES users(id) ON DELETE SET NULL,
- FOREIGN KEY (penguji_3) REFERENCES users(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 CREATE TABLE IF NOT EXISTS notifikasi (
  id INT PRIMARY KEY AUTO_INCREMENT,
  user_id INT NOT NULL,
