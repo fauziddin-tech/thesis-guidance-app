@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+config/database.local.php
+uploads/*
+!uploads/.gitkeep
+*.log
+error_log
+.DS_Store
+Thumbs.db
