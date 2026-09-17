@@ -3,11 +3,15 @@ require_login();
 if($_SERVER['REQUEST_METHOD']==='POST'){
     verify_csrf();
     $old=$_POST['old_password']??''; $new=$_POST['new_password']??''; $confirm=$_POST['new_password_confirm']??'';
-    if($old==='' || strlen($new)<8 || $new!==$confirm) flash('danger','Password lama wajib diisi, password baru minimal 8 karakter dan konfirmasi harus sama.');
-    else {
+    if($old==='' || strlen($new)<8 || $new!==$confirm) {
+        flash('danger','Password lama wajib diisi, password baru minimal 8 karakter dan konfirmasi harus sama.');
+    } else {
         $id=(int)$_SESSION['user']['id']; $stmt=$conn->prepare('SELECT password FROM users WHERE id=?'); $stmt->bind_param('i',$id); $stmt->execute(); $row=$stmt->get_result()->fetch_assoc(); $stmt->close();
         if(!$row || !password_verify($old,$row['password'])) flash('danger','Password lama tidak sesuai.');
-        else { $hash=password_hash($new,PASSWORD_DEFAULT); $stmt=$conn->prepare('UPDATE users SET password=? WHERE id=?'); $stmt->bind_param('si',$hash,$id); flash($stmt->execute()?'success':'danger',$stmt->execute()?'Password berhasil diubah.':'Password gagal diubah.'); $stmt->close(); }
+        else {
+            $hash=password_hash($new,PASSWORD_DEFAULT); $stmt=$conn->prepare('UPDATE users SET password=? WHERE id=?'); $stmt->bind_param('si',$hash,$id); $ok=$stmt->execute(); $stmt->close();
+            flash($ok?'success':'danger',$ok?'Password berhasil diubah.':'Password gagal diubah.');
+        }
     }
     redirect('?page=change-password');
 }
