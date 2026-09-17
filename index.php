@@ -89,4 +89,66 @@ if($action==='notification_read'){
 
 $routes=['home'=>'home.php','login'=>'login.php','register'=>'register.php','dashboard'=>'dashboard.php','profile'=>'profile.php','change-password'=>'change-password.php','bimbingan-detail'=>'bimbingan-detail.php','admin-dashboard'=>'admin-dashboard.php','notifications'=>'notifications.php','konsultasi'=>'konsultasi.php'];
 if(!isset($routes[$page]))$page='home';
-include __DIR__.'/src/views/'.$routes[$page];
+
+$viewFile=__DIR__.'/src/views/'.$routes[$page];
+$viewTitle='MyThesis';
+$pageTitles=['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard','profile'=>'Profil','change-password'=>'Ubah Password','bimbingan-detail'=>'Detail Bimbingan','admin-dashboard'=>'Administrasi Bimbingan','notifications'=>'Notifikasi','konsultasi'=>'Konsultasi'];
+if(isset($pageTitles[$page])) $viewTitle=$pageTitles[$page];
+$user=$_SESSION['user']??null;
+$assetVersion='20260917';
+$flash=take_flash();
+?>
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="MyThesis - Platform bimbingan skripsi mahasiswa dan dosen.">
+    <title><?=e($viewTitle)?> | MyThesis</title>
+    <link rel="stylesheet" href="public/css/style.css?v=<?=$assetVersion?>">
+</head>
+<body>
+<header class="navbar">
+    <div class="container nav-inner">
+        <a class="brand" href="?page=home">MyThesis</a>
+        <nav aria-label="Navigasi utama">
+            <ul class="nav-menu">
+                <li><a href="?page=home">Beranda</a></li>
+                <?php if($user): ?>
+                    <li><a href="?page=dashboard">Dashboard</a></li>
+                    <?php if(($user['role']??'')==='mahasiswa'): ?>
+                        <li><a href="?page=konsultasi">Konsultasi</a></li>
+                    <?php endif; ?>
+                    <?php if(($user['role']??'')==='admin'): ?>
+                        <li><a href="?page=admin-dashboard">Administrasi</a></li>
+                    <?php endif; ?>
+                    <li><a href="?page=notifications">Notifikasi</a></li>
+                    <li><a href="?page=profile">Profil</a></li>
+                    <li>
+                        <form class="inline-form" method="post" action="?page=<?=e($page)?>">
+                            <input type="hidden" name="action" value="logout">
+                            <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+                            <button class="nav-link" type="submit">Keluar</button>
+                        </form>
+                    </li>
+                <?php else: ?>
+                    <li><a href="?page=login">Masuk</a></li>
+                    <li><a href="?page=register">Daftar</a></li>
+                <?php endif; ?>
+            </ul>
+        </nav>
+    </div>
+</header>
+
+<main class="container">
+    <?php if($flash): ?>
+        <div class="alert alert-<?=e($flash['type'])?>" role="alert"><?=e($flash['message'])?></div>
+    <?php endif; ?>
+    <?php include $viewFile; ?>
+</main>
+
+<footer class="footer">
+    <small>MyThesis &mdash; Platform Bimbingan Skripsi</small>
+</footer>
+</body>
+</html>
