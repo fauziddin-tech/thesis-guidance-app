@@ -1,6 +1,6 @@
 <?php
 
-function e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
+if (!function_exists('e')) { function e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); } }
 function sanitize($input): string { return trim((string)$input); }
 function isValidEmail($email): bool { return (bool)filter_var($email, FILTER_VALIDATE_EMAIL); }
 function generateToken(int $length=32): string { return bin2hex(random_bytes(max(1,(int)($length/2)))); }
