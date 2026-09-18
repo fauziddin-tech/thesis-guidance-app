@@ -139,6 +139,8 @@ $flash=take_flash();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="MyThesis - Platform bimbingan skripsi mahasiswa dan dosen.">
     <title><?=e($viewTitle)?> | MyThesis</title>
+    <link rel="icon" type="image/png" href="logo.png?v=<?=$assetVersion?>">
+    <link rel="apple-touch-icon" href="logo.png?v=<?=$assetVersion?>">
     <link rel="stylesheet" href="public/css/style.css?v=<?=$assetVersion?>">
 </head>
 <body>
