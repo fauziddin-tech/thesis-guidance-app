@@ -1,10 +1,85 @@
 <?php
 $user=$_SESSION['user']; $uid=(int)$user['id']; $role=$user['role'];
+$unreadCount=0;
+$ns=$conn->prepare("SELECT COUNT(*) total FROM notifikasi WHERE user_id=? AND dibaca=0");
+if($ns){$ns->bind_param('i',$uid);$ns->execute();$unreadCount=(int)($ns->get_result()->fetch_assoc()['total']??0);$ns->close();}
 ?>
 <div class="page-head">
   <div><h1>Dashboard</h1><p class="muted">Ringkasan bimbingan dan perkembangan skripsi Anda.</p></div>
   <span class="role-badge"><?=e(ucfirst($role))?></span>
 </div>
+
+<section class="dashboard-attention">
+  <div class="dashboard-stat-card">
+    <div class="dashboard-stat-label">Notifikasi Belum Dibaca</div>
+    <div class="dashboard-stat-value"><?=e($unreadCount)?></div>
+    <p class="muted"><?= $unreadCount ? 'Ada informasi baru yang perlu Anda periksa.' : 'Tidak ada notifikasi baru.' ?></p>
+    <a class="btn btn-secondary" href="?page=notifications">Buka Notifikasi</a>
+  </div>
+  <?php if($role==='mahasiswa'): ?>
+    <?php
+    $actionItems=[];
+    $as=$conn->prepare("SELECT id,judul_skripsi,status FROM bimbingan WHERE mahasiswa_id=? AND status IN ('revisi_judul','aktif') ORDER BY updated_at DESC LIMIT 1");
+    if($as){$as->bind_param('i',$uid);$as->execute();$ab=$as->get_result()->fetch_assoc();$as->close();}else{$ab=null;}
+    if($ab){
+      if($ab['status']==='revisi_judul'){
+        $actionItems[]=['title'=>'Perbaiki Judul Skripsi','desc'=>'Dosen meminta revisi judul. Buka detail untuk membaca catatan dan kirim ulang judul.','link'=>'?page=bimbingan-detail&id='.(int)$ab['id']];
+      }else{
+        $latestBab=null;
+        $bs=$conn->prepare("SELECT id,nama_bab,versi,status FROM bab_skripsi WHERE bimbingan_id=? ORDER BY versi DESC,id DESC LIMIT 1");
+        if($bs){$bs->bind_param('i',$ab['id']);$bs->execute();$latestBab=$bs->get_result()->fetch_assoc();$bs->close();}
+        if(!$latestBab){
+          $actionItems[]=['title'=>'Unggah Bab 1','desc'=>'Judul sudah disetujui. Anda dapat memulai bimbingan dengan mengunggah Bab 1.','link'=>'?page=bimbingan-detail&id='.(int)$ab['id']];
+        }elseif($latestBab['status']==='direvisi'){
+          $actionItems[]=['title'=>'Perbaiki '.$latestBab['nama_bab'],'desc'=>'Dosen memberikan revisi. Unggah versi berikutnya setelah memperhatikan catatan review.','link'=>'?page=bimbingan-detail&id='.(int)$ab['id']];
+        }elseif($latestBab['status']==='disetujui' && chapter_number($latestBab['nama_bab'])<5){
+          $next=chapter_number($latestBab['nama_bab'])+1;
+          $actionItems[]=['title'=>'Unggah Bab '.$next,'desc'=>$latestBab['nama_bab'].' telah mendapat ACC. Tahap berikutnya sudah terbuka.','link'=>'?page=bimbingan-detail&id='.(int)$ab['id']];
+        }
+      }
+    }
+    ?>
+    <div class="dashboard-action-card">
+      <div class="dashboard-stat-label">Yang Membutuhkan Tindakan</div>
+      <div class="dashboard-action-list">
+        <?php if(!$actionItems): ?><div class="dashboard-action-empty">Tidak ada tindakan yang perlu dilakukan saat ini.</div>
+        <?php else: foreach($actionItems as $item): ?>
+          <a class="dashboard-action-item" href="<?=e($item['link'])?>">
+            <span><strong><?=e($item['title'])?></strong><small><?=e($item['desc'])?></small></span>
+            <span class="action-arrow">Buka</span>
+          </a>
+        <?php endforeach; endif; ?>
+      </div>
+    </div>
+  <?php elseif($role==='dosen'): ?>
+    <?php
+    $needStudents=[];
+    $qs=$conn->prepare("SELECT b.id,b.judul_skripsi,b.status,u.nama_lengkap mahasiswa_nama
+                        FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id
+                        WHERE b.dosen_id=? AND b.status='pengajuan_judul'
+                        ORDER BY b.created_at ASC");
+    if($qs){$qs->bind_param('i',$uid);$qs->execute();$qr=$qs->get_result();while($row=$qr->fetch_assoc()){$needStudents[]=['id'=>(int)$row['id'],'nama'=>$row['mahasiswa_nama'],'judul'=>$row['judul_skripsi'],'action'=>'Meninjau pengajuan judul'];}$qs->close();}
+    $qs=$conn->prepare("SELECT b.id,b.judul_skripsi,bs.nama_bab,u.nama_lengkap mahasiswa_nama
+                        FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id
+                        JOIN bab_skripsi bs ON bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=b.id ORDER BY x.uploaded_at DESC,x.id DESC LIMIT 1)
+                        WHERE b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review'
+                        ORDER BY bs.uploaded_at ASC");
+    if($qs){$qs->bind_param('i',$uid);$qs->execute();$qr=$qs->get_result();while($row=$qr->fetch_assoc()){$needStudents[]=['id'=>(int)$row['id'],'nama'=>$row['mahasiswa_nama'],'judul'=>$row['judul_skripsi'],'action'=>'Review '.$row['nama_bab']];}$qs->close();}
+    ?>
+    <div class="dashboard-action-card">
+      <div class="dashboard-stat-label">Mahasiswa yang Membutuhkan Tindakan</div>
+      <div class="dashboard-action-list">
+        <?php if(!$needStudents): ?><div class="dashboard-action-empty">Tidak ada mahasiswa yang sedang menunggu tindakan Anda.</div>
+        <?php else: foreach($needStudents as $item): ?>
+          <a class="dashboard-action-item" href="?page=bimbingan-detail&id=<?=e($item['id'])?>">
+            <span><strong><?=e($item['nama'])?></strong><small><?=e($item['action'])?> · <?=e($item['judul'])?></small></span>
+            <span class="action-arrow">Detail</span>
+          </a>
+        <?php endforeach; endif; ?>
+      </div>
+    </div>
+  <?php endif; ?>
+</section>
 
 <section class="card research-flow-card">
   <div class="section-heading">
