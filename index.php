@@ -33,10 +33,10 @@ if($action==='login'){
 }
 
 if($action==='register'){
-    verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$dosen=(int)($_POST['dosen_pembimbing_id']??0);$password=$_POST['password']??'';
-    if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||$dosen<1||strlen($password)<8){flash('danger','Data pendaftaran tidak valid. Password minimal 8 karakter.');redirect('?page=register');}
+    verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$telp=trim($_POST['no_telp']??'');$dosen=(int)($_POST['dosen_pembimbing_id']??0);$password=$_POST['password']??'';$confirm=$_POST['confirm_password']??'';
+    if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||$dosen<1||strlen($password)<8||$password!==$confirm){flash('danger','Data pendaftaran tidak valid. Password minimal 8 karakter.');redirect('?page=register');}
     $s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen' LIMIT 1");$s->bind_param('i',$dosen);$s->execute();$validDosen=$s->get_result()->num_rows>0;$s->close();if(!$validDosen){flash('danger','Dosen pembimbing tidak valid. Silakan pilih dosen yang tersedia.');redirect('?page=register');}
-    $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,dosen_pembimbing_id) VALUES(?,?,?,?,?,?)');$s->bind_param('sssssi',$username,$email,$hash,$role,$nama,$dosen);
+    $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp,dosen_pembimbing_id) VALUES(?,?,?,?,?,?,?)');$s->bind_param('ssssssi',$username,$email,$hash,$role,$nama,$telp,$dosen);
     if($s->execute()) flash('success','Registrasi berhasil. Silakan login.'); else flash('danger','Registrasi gagal. Username/email mungkin sudah digunakan.');$s->close();redirect('?page=login');
 }
 
