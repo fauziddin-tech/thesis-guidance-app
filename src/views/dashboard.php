@@ -16,15 +16,19 @@ $user=$_SESSION['user']; $uid=(int)$user['id']; $role=$user['role'];
 
 <?php if($role==='mahasiswa'): ?>
 <?php
-$s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status='aktif' LIMIT 1"); $s->bind_param('i',$uid); $s->execute(); $hasActive=$s->get_result()->num_rows>0; $s->close();
+$s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul') LIMIT 1"); $s->bind_param('i',$uid); $s->execute(); $hasActive=$s->get_result()->num_rows>0; $s->close();
 ?>
 <div class="grid-2">
 <section class="card">
-  <h2><?= $hasActive ? 'Bimbingan Aktif' : 'Ajukan Bimbingan' ?></h2>
+  <h2><?= $hasActive ? 'Pengajuan / Bimbingan' : 'Pengajuan Judul Skripsi' ?></h2>
   <?php if($hasActive): ?>
-    <p class="muted">Anda memiliki bimbingan aktif. Gunakan detail bimbingan untuk memantau status setiap bab.</p>
-    <?php $s=$conn->prepare("SELECT id,judul_skripsi FROM bimbingan WHERE mahasiswa_id=? AND status='aktif' LIMIT 1");$s->bind_param('i',$uid);$s->execute();$active=$s->get_result()->fetch_assoc();$s->close(); ?>
-    <?php if($active): ?><div class="meta-item"><div class="meta-label">Judul Skripsi</div><div class="meta-value"><?=e($active['judul_skripsi'])?></div></div><div class="actions"><a class="btn btn-primary" href="?page=bimbingan-detail&id=<?=$active['id']?>">Buka Detail Bimbingan</a></div><?php endif; ?>
+    <?php $s=$conn->prepare("SELECT id,judul_skripsi,status FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul') LIMIT 1");$s->bind_param('i',$uid);$s->execute();$active=$s->get_result()->fetch_assoc();$s->close(); ?>
+    <?php if($active): ?>
+      <div class="meta-item"><div class="meta-label">Judul Skripsi</div><div class="meta-value"><?=e($active['judul_skripsi'])?></div></div>
+      <div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><?=getStatusBadge($active['status'])?></div></div>
+      <?php if($active['status']==='pengajuan_judul'): ?><p class="muted">Judul sedang menunggu persetujuan dosen. Setelah disetujui, Bab 1 dapat diunggah.</p><?php endif; ?>
+      <div class="actions"><a class="btn btn-primary" href="?page=bimbingan-detail&id=<?=$active['id']?>">Buka Detail</a></div>
+    <?php endif; ?>
   <?php else: ?>
     <form method="post">
       <input type="hidden" name="action" value="create_bimbingan"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
@@ -54,6 +58,11 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status='akt
 </section>
 
 <?php elseif($role==='dosen'): ?>
+<section class="card">
+  <div class="section-heading"><h2>Pengajuan Judul</h2><p class="muted">Setujui judul mahasiswa sebelum mereka dapat mengunggah Bab 1.</p></div>
+  <?php $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.deskripsi,b.created_at,u.nama_lengkap mahasiswa_nama FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='pengajuan_judul' ORDER BY b.created_at ASC");$s->bind_param('i',$uid);$s->execute();$judulRows=$s->get_result();if(!$judulRows->num_rows): ?><div class="empty-state">Belum ada pengajuan judul.</div><?php else: ?><div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul</th><th>Deskripsi</th><th>Aksi</th></tr></thead><tbody><?php while($j=$judulRows->fetch_assoc()): ?><tr><td><?=e($j['mahasiswa_nama'])?></td><td><strong><?=e($j['judul_skripsi'])?></strong></td><td><?=e($j['deskripsi']?:'-')?></td><td><form method="post" class="inline-form"><input type="hidden" name="action" value="approve_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>"><button class="btn btn-success" type="submit">Setujui Judul</button></form></td></tr><?php endwhile; ?></tbody></table></div><?php endif;$s->close(); ?>
+</section>
+
 <section class="card">
   <div class="section-heading"><h2>Mahasiswa Bimbingan</h2><p class="muted">Pantau status bimbingan dan buka detail untuk melihat riwayat bab.</p></div>
   <?php $s=$conn->prepare("SELECT b.*,u.nama_lengkap mahasiswa_nama,u.email FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? ORDER BY b.updated_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();if(!$r->num_rows): ?><div class="empty-state">Belum ada mahasiswa bimbingan.</div><?php else: ?><div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul Skripsi</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($b=$r->fetch_assoc()): ?><tr><td><strong><?=e($b['mahasiswa_nama'])?></strong><br><small><?=e($b['email'])?></small></td><td><?=e($b['judul_skripsi'])?></td><td><?=getStatusBadge($b['status'])?></td><td><a class="btn btn-secondary" href="?page=bimbingan-detail&id=<?=$b['id']?>">Lihat Detail</a></td></tr><?php endwhile; ?></tbody></table></div><?php endif;$s->close(); ?>
