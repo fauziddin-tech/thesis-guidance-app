@@ -40,6 +40,28 @@ if($action==='register'){
     if($s->execute()) flash('success','Registrasi berhasil. Silakan login.'); else flash('danger','Registrasi gagal. Username/email mungkin sudah digunakan.');$s->close();redirect('?page=login');
 }
 
+if($action==='update_profile'){
+    require_login();verify_csrf();$uid=(int)$_SESSION['user']['id'];$nama=trim($_POST['nama_lengkap']??'');$email=trim($_POST['email']??'');$telp=trim($_POST['no_telp']??'');
+    if($nama===''||!filter_var($email,FILTER_VALIDATE_EMAIL)){flash('danger','Nama lengkap dan email yang valid wajib diisi.');redirect('?page=profile');}
+    $s=$conn->prepare('SELECT id FROM users WHERE email=? AND id<>? LIMIT 1');$s->bind_param('si',$email,$uid);$s->execute();$exists=$s->get_result()->num_rows>0;$s->close();if($exists){flash('danger','Email sudah digunakan pengguna lain.');redirect('?page=profile');}
+    $photoPath=null;$photo=$_FILES['profile_photo']??null;
+    if($photo&&$photo['error']!==UPLOAD_ERR_NO_FILE){
+        if($photo['error']!==UPLOAD_ERR_OK||$photo['size']>2*1024*1024){flash('danger','Foto profil maksimal 2 MB.');redirect('?page=profile');}
+        $finfo=new finfo(FILEINFO_MIME_TYPE);$mime=$finfo->file($photo['tmp_name']);$allowed=['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp'];
+        if(!isset($allowed[$mime])){flash('danger','Format foto harus JPG, PNG, atau WEBP.');redirect('?page=profile');}
+        $dir=__DIR__.'/uploads/profil';if(!is_dir($dir))mkdir($dir,0750,true);$photoPath='uploads/profil/'.bin2hex(random_bytes(16)).'.'.$allowed[$mime];
+        if(!move_uploaded_file($photo['tmp_name'],__DIR__.'/'.$photoPath)){flash('danger','Foto profil gagal disimpan.');redirect('?page=profile');}
+    }
+    $oldPhoto=null;$s=$conn->prepare('SELECT profile_photo FROM users WHERE id=? LIMIT 1');$s->bind_param('i',$uid);$s->execute();$oldPhoto=$s->get_result()->fetch_assoc()['profile_photo']??null;$s->close();
+    if($photoPath){$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=?,profile_photo=? WHERE id=?');$s->bind_param('ssssi',$nama,$email,$telp,$photoPath,$uid);}else{$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=? WHERE id=?');$s->bind_param('sssi',$nama,$email,$telp,$uid);}
+    if($s->execute()){
+        $_SESSION['user']['nama_lengkap']=$nama;$_SESSION['user']['email']=$email;$_SESSION['user']['no_telp']=$telp;if($photoPath)$_SESSION['user']['profile_photo']=$photoPath;
+        if($photoPath&&$oldPhoto&&strpos($oldPhoto,'uploads/profil/')===0){$oldReal=realpath(__DIR__.'/'.$oldPhoto);$base=realpath(__DIR__.'/uploads/profil');if($oldReal&&$base&&strpos($oldReal,$base.DIRECTORY_SEPARATOR)===0)@unlink($oldReal);}
+        flash('success','Profil berhasil diperbarui.');
+    }else{if($photoPath)@unlink(__DIR__.'/'.$photoPath);flash('danger','Profil gagal diperbarui.');}
+    $s->close();redirect('?page=profile');
+}
+
 if($action==='create_bimbingan'){
     require_role(['mahasiswa']);verify_csrf();$uid=(int)$_SESSION['user']['id'];$dosen=(int)($_POST['dosen_id']??0);$judul=trim($_POST['judul_skripsi']??'');$desc=trim($_POST['deskripsi']??'');
     if($judul===''||$dosen<1){flash('danger','Judul dan dosen wajib dipilih.');redirect('?page=dashboard');}
