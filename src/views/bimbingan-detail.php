@@ -80,6 +80,27 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
       <?php endforeach; ?>
       </tbody></table></div>
 
+      <?php if($u['role']==='mahasiswa' && $history[0]['status']==='direvisi'): ?>
+      <div class="review-panel" style="margin-top:18px;">
+        <div class="section-heading">
+          <h4>Unggah Revisi <?=$name?></h4>
+          <p class="muted">Silakan perbaiki dokumen berdasarkan catatan dosen, lalu unggah versi berikutnya untuk direview kembali.</p>
+        </div>
+        <form method="post" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="upload_bab">
+          <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+          <input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+          <input type="hidden" name="nama_bab" value="<?=e($name)?>">
+          <div class="form-group">
+            <label>File Revisi <?=$name?></label>
+            <input type="file" name="file" accept=".pdf,.doc,.docx" required>
+            <small class="muted">PDF, DOC, atau DOCX. Maksimal 10 MB. File ini akan disimpan sebagai versi berikutnya.</small>
+          </div>
+          <button class="btn btn-primary" type="submit">Unggah Revisi <?=$name?></button>
+        </form>
+      </div>
+      <?php endif; ?>
+
       <?php if($u['role']==='dosen' && $history[0]['status']==='menunggu_review'): ?>
       <div class="review-panel" style="margin-top:18px;">
         <div class="section-heading">
