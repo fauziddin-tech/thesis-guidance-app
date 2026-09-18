@@ -74,9 +74,32 @@ if($action==='upload_bab'){
 }
 
 if($action==='add_revision'){
-    require_role(['dosen']);verify_csrf();$uid=(int)$_SESSION['user']['id'];$babId=(int)($_POST['bab_id']??0);$comment=trim($_POST['komentar']??'');$type=$_POST['tipe_revisi']??'minor';if($comment===''||!in_array($type,['minor','major','kritis'],true)){flash('danger','Komentar dan tipe revisi wajib diisi.');redirect('?page=dashboard');}
-    $s=$conn->prepare("SELECT bs.id,bs.nama_bab,b.mahasiswa_id FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id WHERE bs.id=? AND b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review' AND bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=bs.bimbingan_id AND x.nama_bab=bs.nama_bab ORDER BY x.versi DESC,x.id DESC LIMIT 1)");$s->bind_param('ii',$babId,$uid);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();if(!$r){flash('danger','Bab tidak dapat direvisi.');redirect('?page=dashboard');}
-    $conn->begin_transaction();try{$s=$conn->prepare('INSERT INTO revisi(bab_id,dosen_id,komentar,tipe_revisi) VALUES(?,?,?,?)');$s->bind_param('iiss',$babId,$uid,$comment,$type);if(!$s->execute())throw new Exception();$s->close();$s=$conn->prepare("UPDATE bab_skripsi SET status='direvisi' WHERE id=?");$s->bind_param('i',$babId);if(!$s->execute())throw new Exception();$s->close();$conn->commit();notify_user($conn,(int)$r['mahasiswa_id'],'revisi_bab','Ada revisi untuk '.$r['nama_bab'].'.','?page=bimbingan-detail&id='.(int)$_POST['bimbingan_id']);flash('success','Revisi berhasil dikirim.');}catch(Throwable $e){$conn->rollback();flash('danger','Revisi gagal disimpan.');}redirect('?page=dashboard');
+    require_role(['dosen']);verify_csrf();
+    $uid=(int)$_SESSION['user']['id'];$babId=(int)($_POST['bab_id']??0);
+    $comment=trim($_POST['komentar']??'');$type=$_POST['tipe_revisi']??'minor';
+    if($comment===''||!in_array($type,['minor','major','kritis'],true)){flash('danger','Komentar dan tipe revisi wajib diisi.');redirect('?page=dashboard');}
+    $s=$conn->prepare("SELECT bs.id,bs.nama_bab,b.id AS bimbingan_id,b.mahasiswa_id FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id WHERE bs.id=? AND b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review' AND bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=bs.bimbingan_id AND x.nama_bab=bs.nama_bab ORDER BY x.versi DESC,x.id DESC LIMIT 1)");
+    $s->bind_param('ii',$babId,$uid);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();
+    if(!$r){flash('danger','Bab tidak dapat direvisi.');redirect('?page=dashboard');}
+    $filePath=null;$file=$_FILES['file_revisi']??null;
+    if($file && $file['error']!==UPLOAD_ERR_NO_FILE){
+        if($file['error']!==UPLOAD_ERR_OK||$file['size']>10*1024*1024){flash('danger','File revisi maksimal 10 MB.');redirect('?page=dashboard');}
+        $finfo=new finfo(FILEINFO_MIME_TYPE);$mime=$finfo->file($file['tmp_name']);
+        $allowed=['application/pdf'=>'pdf','application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx'];
+        if(!isset($allowed[$mime])){flash('danger','Format file revisi harus PDF, DOC, atau DOCX.');redirect('?page=dashboard');}
+        $dir=__DIR__.'/uploads/revisi';if(!is_dir($dir))mkdir($dir,0750,true);
+        $filePath='uploads/revisi/'.bin2hex(random_bytes(16)).'.'.$allowed[$mime];
+        if(!move_uploaded_file($file['tmp_name'],__DIR__.'/'.$filePath)){flash('danger','File revisi gagal disimpan.');redirect('?page=dashboard');}
+    }
+    $conn->begin_transaction();try{
+        $s=$conn->prepare('INSERT INTO revisi(bab_id,dosen_id,komentar,tipe_revisi,file_path) VALUES(?,?,?,?,?)');
+        $s->bind_param('iisss',$babId,$uid,$comment,$type,$filePath);if(!$s->execute())throw new Exception();$s->close();
+        $s=$conn->prepare("UPDATE bab_skripsi SET status='direvisi' WHERE id=?");$s->bind_param('i',$babId);if(!$s->execute())throw new Exception();$s->close();
+        $conn->commit();
+        notify_user($conn,(int)$r['mahasiswa_id'],'revisi_bab','Ada revisi untuk '.$r['nama_bab'].'.','?page=bimbingan-detail&id='.(int)$r['bimbingan_id']);
+        flash('success','Komentar revisi berhasil dikirim'.($filePath?' beserta file revisi.':'.'));
+    }catch(Throwable $e){$conn->rollback();if($filePath)@unlink(__DIR__.'/'.$filePath);flash('danger','Revisi gagal disimpan.');}
+    redirect('?page=dashboard');
 }
 
 if($action==='approve_bab'){
