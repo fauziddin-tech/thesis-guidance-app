@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS bimbingan (
  dosen_id INT NOT NULL,
  judul_skripsi VARCHAR(255) NOT NULL,
  deskripsi TEXT,
- status ENUM('aktif','selesai','ditangguhkan') DEFAULT 'aktif',
+ status ENUM('pengajuan_judul','aktif','selesai','ditangguhkan') DEFAULT 'pengajuan_judul',
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  FOREIGN KEY (mahasiswa_id) REFERENCES users(id) ON DELETE CASCADE,
