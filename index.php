@@ -56,7 +56,7 @@ if($action==='update_profile'){
     $oldPhoto=null;$s=$conn->prepare('SELECT profile_photo FROM users WHERE id=? LIMIT 1');$s->bind_param('i',$uid);$s->execute();$oldPhoto=$s->get_result()->fetch_assoc()['profile_photo']??null;$s->close();
     if($photoPath){$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=?,profile_photo=? WHERE id=?');$s->bind_param('ssssi',$nama,$email,$telp,$photoPath,$uid);}else{$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=? WHERE id=?');$s->bind_param('sssi',$nama,$email,$telp,$uid);}
     if($s->execute()){
-        $_SESSION['user']['nama_lengkap']=$nama;$_SESSION['user']['email']=$email;$_SESSION['user']['no_telp']=$telp;if($photoPath)$_SESSION['user']['profile_photo']=$photoPath;
+        $_SESSION['user']['nama_lengkap']=$nama;$_SESSION['user']['email']=$email;$_SESSION['user']['no_telp']=$telp;if($photoPath)$_SESSION['user']['profile_photo']=$photoPath; send_user_email($conn,$uid,'Profil MyThesis diperbarui','Profil berhasil diperbarui','Informasi profil akun Anda telah diperbarui. Jika Anda tidak melakukan perubahan ini, segera hubungi administrator.','?page=profile','Buka Profil');
         if($photoPath&&$oldPhoto&&strpos($oldPhoto,'uploads/profil/')===0){$oldReal=realpath(__DIR__.'/'.$oldPhoto);$base=realpath(__DIR__.'/uploads/profil');if($oldReal&&$base&&strpos($oldReal,$base.DIRECTORY_SEPARATOR)===0)@unlink($oldReal);}
         flash('success','Profil berhasil diperbarui.');
     }else{if($photoPath)@unlink(__DIR__.'/'.$photoPath);flash('danger','Profil gagal diperbarui.');}
@@ -164,7 +164,7 @@ if($action==='approve_bab'){
 }
 
 if($action==='admin_assign_dosen'){
-    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$did=(int)($_POST['dosen_id']??0);$s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen'");$s->bind_param('i',$did);$s->execute();$ok=$s->get_result()->num_rows>0;$s->close();if($ok){$s=$conn->prepare('UPDATE bimbingan SET dosen_id=? WHERE id=?');$s->bind_param('ii',$did,$bid);$s->execute();$s->close();flash('success','Dosen pembimbing diperbarui.');}else flash('danger','Dosen tidak valid.');redirect('?page=admin-dashboard');
+    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$did=(int)($_POST['dosen_id']??0);$s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen'");$s->bind_param('i',$did);$s->execute();$ok=$s->get_result()->num_rows>0;$s->close();if($ok){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();$s=$conn->prepare('UPDATE bimbingan SET dosen_id=? WHERE id=?');$s->bind_param('ii',$did,$bid);$s->execute();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'dosen_diubah','Dosen pembimbing untuk bimbingan Anda telah diperbarui.','?page=bimbingan-detail&id='.$bid);flash('success','Dosen pembimbing diperbarui.');}else flash('danger','Dosen tidak valid.');redirect('?page=admin-dashboard');
 }
 
 if($action==='admin_bimbingan_status'){
