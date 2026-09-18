@@ -7,8 +7,9 @@ $user=$_SESSION['user']; $uid=(int)$user['id']; $role=$user['role'];
 </div>
 
 <div class="card">
-  <div class="section-heading"><h2>Alur Bimbingan</h2><p class="muted">Setiap bab dikerjakan secara berurutan sampai Bab 5 mendapat ACC.</p></div>
+  <div class="section-heading"><h2>Alur Bimbingan</h2><p class="muted">Pengajuan judul merupakan tahap awal sebelum Bab 1 sampai Bab 5.</p></div>
   <div class="workflow">
+    <div class="workflow-step">Pengajuan Judul</div>
     <?php for($i=1;$i<=5;$i++): ?><div class="workflow-step">Bab <?=$i?></div><?php endfor; ?>
   </div>
   <div class="hint">Status <strong>Menunggu Review</strong> berarti sedang diperiksa dosen. Status <strong>Direvisi</strong> berarti mahasiswa dapat mengunggah versi berikutnya. Setelah <strong>Bab 5 disetujui</strong>, bimbingan otomatis selesai.</div>
