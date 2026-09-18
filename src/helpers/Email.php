@@ -1,0 +1,94 @@
+<?php
+/**
+ * Resend email helper.
+ * Required environment variables:
+ * RESEND_API_KEY, MAIL_FROM
+ * Optional: MAIL_FROM_NAME, APP_URL
+ */
+function send_resend_email(string $to, string $subject, string $html): bool {
+    $apiKey = getenv('RESEND_API_KEY') ?: '';
+    $from = getenv('MAIL_FROM') ?: '';
+    $fromName = getenv('MAIL_FROM_NAME') ?: 'MyThesis';
+
+    if ($apiKey === '' || $from === '') {
+        error_log('Resend email is not configured. Set RESEND_API_KEY and MAIL_FROM.');
+        return false;
+    }
+
+    if (!function_exists('curl_init')) {
+        error_log('Resend email failed: PHP cURL extension is not enabled.');
+        return false;
+    }
+
+    $payload = json_encode([
+        'from' => $fromName . ' <' . $from . '>',
+        'to' => [$to],
+        'subject' => $subject,
+        'html' => $html,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $ch = curl_init('https://api.resend.com/emails');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $apiKey,
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ],
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 20,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($response === false || $httpCode < 200 || $httpCode >= 300) {
+        error_log('Resend email failed. HTTP ' . $httpCode . ($curlError ? ' - ' . $curlError : '') . ($response ? ' - ' . substr($response, 0, 500) : ''));
+        return false;
+    }
+
+    return true;
+}
+
+function email_escape(string $value): string {
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+function send_user_email(mysqli $conn, int $userId, string $subject, string $title, string $message, ?string $link = null, ?string $buttonText = null): bool {
+    $stmt = $conn->prepare('SELECT email,nama_lengkap FROM users WHERE id=? LIMIT 1');
+    if (!$stmt) return false;
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $user = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$user || !filter_var($user['email'] ?? '', FILTER_VALIDATE_EMAIL)) return false;
+
+    $name = email_escape($user['nama_lengkap'] ?? 'Pengguna');
+    $safeTitle = email_escape($title);
+    $safeMessage = nl2br(email_escape($message));
+    $button = '';
+    if ($link) {
+        $url = $link;
+        if (preg_match('#^https?://#i', $url) !== 1) {
+            $base = rtrim(getenv('APP_URL') ?: '', '/');
+            if ($base !== '') $url = $base . '/' . ltrim($url, '/');
+        }
+        $button = '<p style="margin:24px 0"><a href="' . email_escape($url) . '" style="display:inline-block;padding:10px 16px;background:#315d82;color:#fff;text-decoration:none;border-radius:5px;font-weight:700">' . email_escape($buttonText ?: 'Buka MyThesis') . '</a></p>';
+    }
+
+    $html = '<!doctype html><html lang="id"><body style="margin:0;padding:24px;background:#f5f7f9;font-family:Arial,Segoe UI,sans-serif;color:#263541">'
+          . '<div style="max-width:640px;margin:auto;background:#fff;border:1px solid #dfe5ea;border-radius:8px;padding:28px">'
+          . '<div style="font-size:20px;font-weight:700;color:#162536;margin-bottom:22px">MyThesis</div>'
+          . '<p>Halo ' . $name . ',</p>'
+          . '<h2 style="font-size:21px;margin:16px 0 10px">' . $safeTitle . '</h2>'
+          . '<p style="line-height:1.6">' . $safeMessage . '</p>'
+          . $button
+          . '<p style="font-size:12px;color:#71808e;border-top:1px solid #e2e7eb;padding-top:18px;margin-top:26px">Email ini dikirim otomatis oleh MyThesis. Jika Anda tidak melakukan aktivitas tersebut, silakan hubungi administrator.</p>'
+          . '</div></body></html>';
+
+    return send_resend_email($user['email'], $subject, $html);
+}
