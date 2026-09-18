@@ -59,7 +59,10 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
         <td><?=getStatusBadge($row['status'])?></td>
         <td><?=e($row['total_revisi'])?></td>
         <td><?=e(formatDateTime($row['uploaded_at']))?></td>
-        <td><a class="btn btn-secondary" target="_blank" rel="noopener" href="download.php?id=<?=e($row['id'])?>">Buka Dokumen</a></td>
+        <td>
+          <?php $ext=strtolower(pathinfo((string)$row['file_path'],PATHINFO_EXTENSION)); ?>
+          <a class="btn btn-secondary" target="_blank" rel="noopener" href="download.php?id=<?=e($row['id'])?>"><?= $ext==='pdf' ? 'Preview Dokumen' : 'Buka Dokumen' ?></a>
+        </td>
       </tr>
       <?php if(!empty($revisionMap[(int)$row['id']])): ?>
         <?php foreach($revisionMap[(int)$row['id']] as $rv): ?>
@@ -74,9 +77,46 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
         </tr>
         <?php endforeach; ?>
       <?php endif; ?>
-      </tr>
       <?php endforeach; ?>
       </tbody></table></div>
+
+      <?php if($u['role']==='dosen' && $history[0]['status']==='menunggu_review'): ?>
+      <div class="review-panel" style="margin-top:18px;">
+        <div class="section-heading">
+          <h4>Tindakan Review Dosen</h4>
+          <p class="muted">Versi terbaru dapat dikembalikan untuk revisi atau langsung di-ACC.</p>
+        </div>
+        <form method="post" enctype="multipart/form-data">
+          <input type="hidden" name="action" value="add_revision">
+          <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+          <input type="hidden" name="bab_id" value="<?=e($history[0]['id'])?>">
+          <div class="form-group">
+            <label>Komentar / Catatan Revisi</label>
+            <textarea name="komentar" placeholder="Tuliskan bagian yang perlu diperbaiki." required></textarea>
+          </div>
+          <div class="form-group">
+            <label>Tipe Revisi</label>
+            <select name="tipe_revisi">
+              <option value="minor">Minor</option>
+              <option value="major">Major</option>
+              <option value="kritis">Kritis</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>File Revisi dari Dosen</label>
+            <input type="file" name="file_revisi" accept=".pdf,.doc,.docx">
+            <small class="muted">Opsional, maksimal 10 MB.</small>
+          </div>
+          <button class="btn btn-warning" type="submit">Kirim Revisi</button>
+        </form>
+        <form method="post" style="margin-top:10px;">
+          <input type="hidden" name="action" value="approve_bab">
+          <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+          <input type="hidden" name="bab_id" value="<?=e($history[0]['id'])?>">
+          <button class="btn btn-success" type="submit">Setujui / ACC Bab</button>
+        </form>
+      </div>
+      <?php endif; ?>
     <?php endif; ?>
   </section>
   <?php endfor; ?>
