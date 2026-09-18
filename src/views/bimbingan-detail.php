@@ -8,6 +8,10 @@ $u=$_SESSION['user'];
 if($u['role']==='mahasiswa'&&(int)$b['mahasiswa_id']!==(int)$u['id']){http_response_code(403);exit('Akses ditolak.');}
 if($u['role']==='dosen'&&(int)$b['dosen_id']!==(int)$u['id']){http_response_code(403);exit('Akses ditolak.');}
 $rows=$ctrl->getBabSkripsi($id);$progress=$ctrl->getProgress($id);$babByName=[];
+$revisionMap=[];
+$rs=$conn->prepare("SELECT r.id,r.bab_id,r.komentar,r.tipe_revisi,r.file_path,r.created_at,d.nama_lengkap AS dosen_nama FROM revisi r JOIN bab_skripsi bs ON bs.id=r.bab_id JOIN users d ON d.id=r.dosen_id WHERE bs.bimbingan_id=? ORDER BY r.created_at DESC");
+$rs->bind_param('i',$id);$rs->execute();$revRows=$rs->get_result()->fetch_all(MYSQLI_ASSOC);$rs->close();
+foreach($revRows as $rv){$revisionMap[(int)$rv['bab_id']][]=$rv;}
 foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
 ?>
 <div class="page-head">
@@ -56,6 +60,20 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
         <td><?=e($row['total_revisi'])?></td>
         <td><?=e(formatDateTime($row['uploaded_at']))?></td>
         <td><a class="btn btn-secondary" target="_blank" rel="noopener" href="download.php?id=<?=e($row['id'])?>">Buka Dokumen</a></td>
+      </tr>
+      <?php if(!empty($revisionMap[(int)$row['id']])): ?>
+        <?php foreach($revisionMap[(int)$row['id']] as $rv): ?>
+        <tr>
+          <td colspan="5">
+            <div class="meta-item">
+              <div class="meta-label">Catatan Dosen — <?=e($rv['dosen_nama'])?> (<?=e(formatDateTime($rv['created_at']))?>)</div>
+              <div class="meta-value"><?=nl2br(e($rv['komentar']))?></div>
+              <?php if(!empty($rv['file_path'])): ?><div class="actions"><a class="btn btn-secondary" target="_blank" rel="noopener" href="download.php?revisi=<?=e($rv['id'])?>">Buka File Revisi Dosen</a></div><?php endif; ?>
+            </div>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      <?php endif; ?>
       </tr>
       <?php endforeach; ?>
       </tbody></table></div>
