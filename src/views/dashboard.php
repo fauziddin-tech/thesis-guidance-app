@@ -141,7 +141,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 </div>
 
 <section class="card">
-  <div class="section-heading"><h2>Riwayat Bimbingan</h2><p class="muted">Daftar seluruh pengajuan bimbingan Anda.</p></div>
+  <div class="section-heading"><div><h2>Riwayat Bimbingan</h2><p class="muted">Daftar seluruh pengajuan bimbingan Anda.</p></div><div class="actions" style="margin-top:12px"><a class="btn btn-secondary" href="export-riwayat.php?format=word" target="_blank" rel="noopener">Unduh Word</a><a class="btn btn-secondary" href="export-riwayat.php?format=pdf" target="_blank" rel="noopener">Cetak / Simpan PDF</a></div></div>
   <?php $s=$conn->prepare("SELECT b.*,u.nama_lengkap dosen_nama FROM bimbingan b JOIN users u ON u.id=b.dosen_id WHERE b.mahasiswa_id=? ORDER BY b.created_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();if(!$r->num_rows): ?><div class="empty-state">Belum ada bimbingan.</div><?php else: ?><div class="table-wrap"><table><thead><tr><th>Judul Skripsi</th><th>Dosen</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($b=$r->fetch_assoc()): ?><tr><td><?=e($b['judul_skripsi'])?></td><td><?=e($b['dosen_nama'])?></td><td><?=getStatusBadge($b['status'])?></td><td><a class="btn btn-secondary" href="?page=bimbingan-detail&id=<?=$b['id']?>">Lihat Detail</a></td></tr><?php endwhile; ?></tbody></table></div><?php endif;$s->close(); ?>
 </section>
 
