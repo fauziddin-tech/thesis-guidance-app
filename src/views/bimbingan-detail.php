@@ -125,7 +125,7 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
       <div class="modal-section"><div class="review-panel">
         <h4>Revisi Judul dari Dosen</h4><p class="muted">Perbaiki judul sesuai catatan dosen, kemudian kirim ulang untuk ditinjau.</p>
         <div class="meta-item" style="margin-bottom:14px;"><div class="meta-label">Catatan Dosen</div><div class="meta-value"><?=nl2br(e($b['judul_revision_catatan']??'Silakan perbaiki judul sesuai arahan dosen.'))?></div></div>
-        <form method="post"><input type="hidden" name="action" value="submit_judul_revision"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+        <form method="post"><input type="hidden" name="action" value="submit_judul_revision"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
           <div class="form-group"><label>Judul Skripsi Baru</label><input name="judul_skripsi" maxlength="255" value="<?=e($b['judul_skripsi'])?>" required></div>
           <div class="form-group"><label>Penjelasan Perubahan</label><textarea name="deskripsi"><?=e($b['deskripsi']??'')?></textarea></div>
           <button class="btn btn-primary" type="submit">Kirim Ulang Judul</button>
