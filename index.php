@@ -179,6 +179,45 @@ if($action==='notification_read'){
     require_login();verify_csrf();$nid=(int)($_POST['notification_id']??0);$uid=(int)$_SESSION['user']['id'];$s=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE id=? AND user_id=?');$s->bind_param('ii',$nid,$uid);$s->execute();$s->close();redirect('?page=notifications');
 }
 
+
+if($action==='forgot_password'){
+    verify_csrf();
+    $email=trim($_POST['email']??'');
+    if(!filter_var($email,FILTER_VALIDATE_EMAIL)){flash('danger','Masukkan alamat email yang valid.');redirect('?page=forgot-password');}
+    $s=$conn->prepare('SELECT id,nama_lengkap FROM users WHERE email=? LIMIT 1');$s->bind_param('s',$email);$s->execute();$u=$s->get_result()->fetch_assoc();$s->close();
+    if($u){
+        $token=bin2hex(random_bytes(32));$hash=hash('sha256',$token);
+        $s=$conn->prepare('UPDATE password_resets SET used_at=NOW() WHERE user_id=? AND used_at IS NULL');$s->bind_param('i',$u['id']);$s->execute();$s->close();
+        $s=$conn->prepare('INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES(?,?,DATE_ADD(NOW(),INTERVAL 1 HOUR))');$s->bind_param('is',$u['id'],$hash);
+        if($s->execute()){
+            $resetLink='?page=reset-password&token='.rawurlencode($token);
+            send_user_email($conn,(int)$u['id'],'Reset Password MyThesis','Permintaan reset password','Kami menerima permintaan untuk mengatur ulang password akun Anda. Tautan reset berlaku selama 1 jam. Jika Anda tidak meminta reset password, abaikan email ini.',$resetLink,'Reset Password');
+        }
+        $s->close();
+    }
+    flash('success','Jika email terdaftar, instruksi reset password telah dikirim. Periksa inbox dan folder spam.');
+    redirect('?page=forgot-password');
+}
+
+if($action==='reset_password'){
+    verify_csrf();
+    $token=$_POST['token']??'';$new=$_POST['new_password']??'';$confirm=$_POST['new_password_confirm']??'';
+    if(!preg_match('/^[a-f0-9]{64}$/',$token)||strlen($new)<8||$new!==$confirm){flash('danger','Token reset tidak valid atau password tidak memenuhi ketentuan.');redirect('?page=reset-password&token='.rawurlencode($token));}
+    $hash=hash('sha256',$token);
+    $s=$conn->prepare('SELECT id,user_id FROM password_resets WHERE token_hash=? AND used_at IS NULL AND expires_at>NOW() ORDER BY id DESC LIMIT 1');$s->bind_param('s',$hash);$s->execute();$reset=$s->get_result()->fetch_assoc();$s->close();
+    if(!$reset){flash('danger','Tautan reset password tidak valid atau sudah kedaluwarsa.');redirect('?page=forgot-password');}
+    $newHash=password_hash($new,PASSWORD_DEFAULT);
+    $conn->begin_transaction();
+    try{
+        $s=$conn->prepare('UPDATE users SET password=? WHERE id=?');$s->bind_param('si',$newHash,$reset['user_id']);if(!$s->execute())throw new Exception();$s->close();
+        $s=$conn->prepare('UPDATE password_resets SET used_at=NOW() WHERE id=?');$s->bind_param('i',$reset['id']);if(!$s->execute())throw new Exception();$s->close();
+        $conn->commit();
+        send_user_email($conn,(int)$reset['user_id'],'Password MyThesis berhasil diubah','Password berhasil diubah','Password akun Anda telah berhasil diubah melalui proses reset. Jika Anda tidak melakukan perubahan ini, segera hubungi administrator.','?page=login','Masuk ke MyThesis');
+        flash('success','Password berhasil diubah. Silakan login dengan password baru.');
+    }catch(Throwable $e){$conn->rollback();flash('danger','Password gagal diubah. Silakan coba lagi.');}
+    redirect('?page=login');
+}
+
 $routes=['home'=>'home.php','login'=>'login.php','register'=>'register.php','forgot-password'=>'forgot-password.php','reset-password'=>'reset-password.php','dashboard'=>'dashboard.php','profile'=>'profile.php','change-password'=>'change-password.php','bimbingan-detail'=>'bimbingan-detail.php','admin-dashboard'=>'admin-dashboard.php','notifications'=>'notifications.php','konsultasi'=>'konsultasi.php'];
 if(!isset($routes[$page]))$page='home';
 
