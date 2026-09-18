@@ -148,6 +148,10 @@ if($action==='admin_bimbingan_status'){
     require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$status=$_POST['status']??'';require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->updateStatus($bid,$status);flash($r['success']?'success':'danger',$r['success']?'Status bimbingan diperbarui.':'Gagal memperbarui status.');redirect('?page=admin-dashboard');
 }
 
+if($action==='mark_all_notifications_read'){
+    require_login();verify_csrf();$uid=(int)$_SESSION['user']['id'];$s=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE user_id=? AND dibaca=0');if($s){$s->bind_param('i',$uid);$s->execute();$s->close();}redirect('?page=notifications');
+}
+
 if($action==='notification_read'){
     require_login();verify_csrf();$nid=(int)($_POST['notification_id']??0);$uid=(int)$_SESSION['user']['id'];$s=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE id=? AND user_id=?');$s->bind_param('ii',$nid,$uid);$s->execute();$s->close();redirect('?page=notifications');
 }
@@ -160,7 +164,13 @@ $viewTitle='MyThesis';
 $pageTitles=['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard','profile'=>'Profil','change-password'=>'Ubah Password','bimbingan-detail'=>'Detail Bimbingan','admin-dashboard'=>'Administrasi Bimbingan','notifications'=>'Notifikasi','konsultasi'=>'Konsultasi'];
 if(isset($pageTitles[$page])) $viewTitle=$pageTitles[$page];
 $user=$_SESSION['user']??null;
-$assetVersion='20260917';
+$unreadNotificationCount=0;
+if($user){
+    $uidNav=(int)$user['id'];
+    $sNav=$conn->prepare('SELECT COUNT(*) total FROM notifikasi WHERE user_id=? AND dibaca=0');
+    if($sNav){$sNav->bind_param('i',$uidNav);$sNav->execute();$unreadNotificationCount=(int)($sNav->get_result()->fetch_assoc()['total']??0);$sNav->close();}
+}
+$assetVersion='20260918';
 $flash=take_flash();
 ?>
 <!doctype html>
@@ -189,7 +199,7 @@ $flash=take_flash();
                     <?php if(($user['role']??'')==='admin'): ?>
                         <li><a href="?page=admin-dashboard">Administrasi</a></li>
                     <?php endif; ?>
-                    <li><a href="?page=notifications">Notifikasi</a></li>
+                    <li><a class="notification-nav" href="?page=notifications">Notifikasi<?php if($unreadNotificationCount>0): ?><span class="notification-count"><?=e($unreadNotificationCount>99?'99+':$unreadNotificationCount)?></span><?php endif; ?></a></li>
                     <li><a href="?page=profile">Profil</a></li>
                     <li>
                         <form class="inline-form" method="post" action="?page=<?=e($page)?>">
