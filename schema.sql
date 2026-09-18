@@ -13,6 +13,23 @@ CREATE TABLE IF NOT EXISTS users (
  FOREIGN KEY (dosen_pembimbing_id) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+
+CREATE TABLE IF NOT EXISTS bimbingan (
+ id INT PRIMARY KEY AUTO_INCREMENT,
+ mahasiswa_id INT NOT NULL,
+ dosen_id INT NOT NULL,
+ judul_skripsi VARCHAR(255) NOT NULL,
+ deskripsi TEXT,
+ status ENUM('pengajuan_judul','revisi_judul','aktif','selesai','ditangguhkan') DEFAULT 'pengajuan_judul',
+ judul_revision_catatan TEXT NULL,
+ judul_revision_at TIMESTAMP NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY (mahasiswa_id) REFERENCES users(id) ON DELETE CASCADE,
+ FOREIGN KEY (dosen_id) REFERENCES users(id) ON DELETE CASCADE,
+ INDEX idx_bimbingan_mahasiswa (mahasiswa_id), INDEX idx_bimbingan_dosen (dosen_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS judul_revisi (
  id INT PRIMARY KEY AUTO_INCREMENT,
  bimbingan_id INT NOT NULL,
@@ -32,22 +49,6 @@ CREATE TABLE IF NOT EXISTS judul_revisi (
  FOREIGN KEY (mahasiswa_id) REFERENCES users(id) ON DELETE CASCADE,
  INDEX idx_judul_revisi_bimbingan (bimbingan_id),
  INDEX idx_judul_revisi_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS bimbingan (
- id INT PRIMARY KEY AUTO_INCREMENT,
- mahasiswa_id INT NOT NULL,
- dosen_id INT NOT NULL,
- judul_skripsi VARCHAR(255) NOT NULL,
- deskripsi TEXT,
- status ENUM('pengajuan_judul','revisi_judul','aktif','selesai','ditangguhkan') DEFAULT 'pengajuan_judul',
- judul_revision_catatan TEXT NULL,
- judul_revision_at TIMESTAMP NULL,
- created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
- updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
- FOREIGN KEY (mahasiswa_id) REFERENCES users(id) ON DELETE CASCADE,
- FOREIGN KEY (dosen_id) REFERENCES users(id) ON DELETE CASCADE,
- INDEX idx_bimbingan_mahasiswa (mahasiswa_id), INDEX idx_bimbingan_dosen (dosen_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS bab_skripsi (
