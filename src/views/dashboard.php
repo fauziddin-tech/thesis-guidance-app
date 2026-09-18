@@ -49,7 +49,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 <section class="card">
   <h2>Pengajuan Judul Skripsi</h2>
   <?php if($hasActive): ?>
-    <?php $s=$conn->prepare("SELECT id,judul_skripsi,status FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul') LIMIT 1");$s->bind_param('i',$uid);$s->execute();$active=$s->get_result()->fetch_assoc();$s->close(); ?>
+    <?php $s=$conn->prepare("SELECT id,judul_skripsi,deskripsi,status,judul_revision_catatan FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul','revisi_judul') LIMIT 1");$s->bind_param('i',$uid);$s->execute();$active=$s->get_result()->fetch_assoc();$s->close(); ?>
     <?php if($active): ?>
       <div class="meta-item"><div class="meta-label">Judul Skripsi</div><div class="meta-value"><?=e($active['judul_skripsi'])?></div></div>
       <div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><?=getStatusBadge($active['status'])?></div></div>
@@ -159,13 +159,19 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
         <td><?=e($j['judul_skripsi'])?></td>
         <td><?=e($j['deskripsi']?:'-')?></td>
         <td>
+          <div class="actions">
           <form method="post" class="inline-form">
             <input type="hidden" name="action" value="approve_judul">
             <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
             <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
             <div class="actions">
             <button class="btn btn-success" type="submit" name="decision" value="approve">Setujui Judul</button>
-            <button class="btn btn-warning" type="button" data-title-revision="<?=e($j['id'])?>">Minta Revisi Judul</button>
+            <button class="btn btn-warning" type="button" data-title-revision="<?=e($j['id'])?>">Minta Revisi Judul</button>            <form method="post" class="title-revision-form" id="title-revision-<?=e($j['id'])?>" style="display:none;margin-top:12px;">
+              <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+              <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
+              <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" placeholder="Tuliskan bagian judul yang perlu diperbaiki." required></textarea></div>
+              <button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
+            </form>
           </div>
           </form>
         </td>
