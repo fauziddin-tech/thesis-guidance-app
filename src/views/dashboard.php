@@ -29,12 +29,12 @@ $user=$_SESSION['user']; $uid=(int)$user['id']; $role=$user['role'];
       if($flowBimbinganId){
         $fb=$conn->prepare("SELECT status FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=? ORDER BY versi DESC,id DESC LIMIT 1");
         $bn='Bab '.$i;$fb->bind_param('is',$flowBimbinganId,$bn);$fb->execute();$fbr=$fb->get_result()->fetch_assoc();$fb->close();
-        if($fbr){$flowBabStatus=getStatusLabel($fbr['status']);}
+        if($fbr){$flowBabStatus=getStatusBadge($fbr['status']);}
         elseif($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada'){$flowBabStatus='Menunggu judul disetujui';}
       }
       ?>
       <a class="research-flow-item" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
-        <span class="flow-number">0<?=($i+1)?></span><span><strong>Bab <?=$i?></strong><small><?=e($flowBabStatus)?></small></span>
+        <span class="flow-number">0<?=($i+1)?></span><span><strong>Bab <?=$i?></strong><small><?=$flowBabStatus?></small></span>
       </a>
     <?php endfor; ?>
   </div>
