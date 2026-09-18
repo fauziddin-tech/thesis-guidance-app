@@ -26,16 +26,17 @@ if($action==='logout'){
 if($action==='login'){
     verify_csrf(); $identity=trim($_POST['identity']??''); $password=$_POST['password']??'';
     if($identity===''||$password===''){flash('danger','Username/email dan password wajib diisi.');redirect('?page=login');}
-    $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp FROM users WHERE username=? OR email=? LIMIT 1');
+    $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp,dosen_pembimbing_id FROM users WHERE username=? OR email=? LIMIT 1');
     $s->bind_param('ss',$identity,$identity);$s->execute();$user=$s->get_result()->fetch_assoc();$s->close();
     if(!$user||!password_verify($password,$user['password'])){flash('danger','Username/email atau password salah.');redirect('?page=login');}
     unset($user['password']); $_SESSION['user']=$user; session_regenerate_id(true); redirect('?page=dashboard');
 }
 
 if($action==='register'){
-    verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$password=$_POST['password']??'';
-    if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||strlen($password)<8){flash('danger','Data pendaftaran tidak valid. Password minimal 8 karakter.');redirect('?page=register');}
-    $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap) VALUES(?,?,?,?,?)');$s->bind_param('sssss',$username,$email,$hash,$role,$nama);
+    verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$dosen=(int)($_POST['dosen_pembimbing_id']??0);$password=$_POST['password']??'';
+    if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||$dosen<1||strlen($password)<8){flash('danger','Data pendaftaran tidak valid. Password minimal 8 karakter.');redirect('?page=register');}
+    $s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen' LIMIT 1");$s->bind_param('i',$dosen);$s->execute();$validDosen=$s->get_result()->num_rows>0;$s->close();if(!$validDosen){flash('danger','Dosen pembimbing tidak valid. Silakan pilih dosen yang tersedia.');redirect('?page=register');}
+    $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,dosen_pembimbing_id) VALUES(?,?,?,?,?,?)');$s->bind_param('sssssi',$username,$email,$hash,$role,$nama,$dosen);
     if($s->execute()) flash('success','Registrasi berhasil. Silakan login.'); else flash('danger','Registrasi gagal. Username/email mungkin sudah digunakan.');$s->close();redirect('?page=login');
 }
 
