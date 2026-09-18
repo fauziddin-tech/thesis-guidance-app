@@ -16,34 +16,80 @@ if($ns){$ns->bind_param('i',$uid);$ns->execute();$unreadCount=(int)($ns->get_res
   </div>
   <?php
   $flowBimbinganId=0;$flowStatus='belum_ada';
+  $flowCounts=array_fill(0,6,0);
+
   if($role==='mahasiswa'){
     $fs=$conn->prepare("SELECT id,status FROM bimbingan WHERE mahasiswa_id=? ORDER BY created_at DESC LIMIT 1");
-    $fs->bind_param('i',$uid);$fs->execute();$fr=$fs->get_result()->fetch_assoc();$fs->close();
-    if($fr){$flowBimbinganId=(int)$fr['id'];$flowStatus=$fr['status'];}
+    if($fs){$fs->bind_param('i',$uid);$fs->execute();$fr=$fs->get_result()->fetch_assoc();$fs->close();}
+    if(!empty($fr)){
+      $flowBimbinganId=(int)$fr['id'];$flowStatus=$fr['status'];
+
+      if($flowStatus==='revisi_judul'){$flowCounts[0]=1;}
+
+      for($i=1;$i<=5;$i++){
+        $bn='Bab '.$i;
+        $fb=$conn->prepare("SELECT status FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=? ORDER BY versi DESC,id DESC LIMIT 1");
+        if($fb){
+          $fb->bind_param('is',$flowBimbinganId,$bn);$fb->execute();$fbr=$fb->get_result()->fetch_assoc();$fb->close();
+          if(!empty($fbr) && $fbr['status']==='direvisi'){
+            $flowCounts[$i]=1;
+          }elseif(empty($fbr) && $flowStatus==='aktif' && $i===1){
+            $flowCounts[$i]=1;
+          }elseif(!empty($fbr) && $fbr['status']==='disetujui' && $i<5){
+            $flowCounts[$i+1]=1;
+          }
+        }
+      }
+    }
+  }elseif($role==='dosen'){
+    $ds=$conn->prepare("SELECT COUNT(*) total FROM bimbingan WHERE dosen_id=? AND status='pengajuan_judul'");
+    if($ds){$ds->bind_param('i',$uid);$ds->execute();$flowCounts[0]=(int)($ds->get_result()->fetch_assoc()['total']??0);$ds->close();}
+    for($i=1;$i<=5;$i++){
+      $bn='Bab '.$i;
+      $ds=$conn->prepare("SELECT COUNT(*) total
+                          FROM bimbingan b
+                          JOIN bab_skripsi bs ON bs.id=(
+                            SELECT x.id FROM bab_skripsi x
+                            WHERE x.bimbingan_id=b.id AND x.nama_bab=?
+                            ORDER BY x.versi DESC,x.id DESC LIMIT 1
+                          )
+                          WHERE b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review'");
+      if($ds){$ds->bind_param('si',$bn,$uid);$ds->execute();$flowCounts[$i]=(int)($ds->get_result()->fetch_assoc()['total']??0);$ds->close();}
+    }
   }
   ?>
   <div class="research-flow">
-    <a class="research-flow-item <?=($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada')?'is-current':''?>" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
-      <span class="flow-number">01</span><span><strong>Pengajuan Judul</strong><small><?= $flowStatus==='pengajuan_judul'?'Menunggu persetujuan dosen':($flowStatus==='belum_ada'?'Belum diajukan':'Judul disetujui') ?></small></span>
+    <a class="research-flow-item <?=($flowCounts[0]>0||($role==='mahasiswa'&&($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada'))) ? 'is-current':''?>" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
+      <span class="flow-number">01</span>
+      <span class="flow-content">
+        <strong>Pengajuan Judul</strong>
+        <small><?= $role==='dosen' ? 'Pengajuan yang perlu diperiksa' : ($flowStatus==='pengajuan_judul'?'Menunggu persetujuan dosen':($flowStatus==='revisi_judul'?'Perlu revisi judul':($flowStatus==='belum_ada'?'Belum diajukan':'Judul disetujui'))) ?></small>
+      </span>
+      <?php if($flowCounts[0]>0): ?><span class="flow-count"><?=e($flowCounts[0])?></span><?php endif; ?>
     </a>
     <?php for($i=1;$i<=5;$i++): ?>
       <?php
       $flowBabStatus='Belum dimulai';
       if($flowBimbinganId){
         $fb=$conn->prepare("SELECT status FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=? ORDER BY versi DESC,id DESC LIMIT 1");
-        $bn='Bab '.$i;$fb->bind_param('is',$flowBimbinganId,$bn);$fb->execute();$fbr=$fb->get_result()->fetch_assoc();$fb->close();
-        if($fbr){$flowBabStatus=getStatusBadge($fbr['status']);}
-        elseif($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada'){$flowBabStatus='Menunggu judul disetujui';}
+        if($fb){$bn='Bab '.$i;$fb->bind_param('is',$flowBimbinganId,$bn);$fb->execute();$fbr=$fb->get_result()->fetch_assoc();$fb->close();
+          if(!empty($fbr)){$flowBabStatus=getStatusBadge($fbr['status']);}
+          elseif($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada'){$flowBabStatus='Menunggu judul disetujui';}
+          elseif($flowStatus==='aktif'&&$i===1){$flowBabStatus='Siap diunggah';}
+        }
+      }elseif($role==='dosen' && $flowCounts[$i]>0){
+        $flowBabStatus='Ada pengajuan yang perlu diperiksa';
       }
       ?>
-      <a class="research-flow-item" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
-        <span class="flow-number">0<?=($i+1)?></span><span><strong>Bab <?=$i?></strong><small><?=$flowBabStatus?></small></span>
+      <a class="research-flow-item <?= $flowCounts[$i]>0 ? 'is-current':'' ?>" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
+        <span class="flow-number">0<?=($i+1)?></span>
+        <span class="flow-content"><strong>Bab <?=$i?></strong><small><?=$flowBabStatus?></small></span>
+        <?php if($flowCounts[$i]>0): ?><span class="flow-count"><?=e($flowCounts[$i])?></span><?php endif; ?>
       </a>
     <?php endfor; ?>
   </div>
-  <div class="hint">Setiap tahap membuka detail bimbingan yang sesuai. Bab berikutnya hanya dapat diproses setelah bab sebelumnya mendapat ACC.</div>
+  <div class="hint">Angka pada setiap tahap menunjukkan jumlah tindakan yang perlu diperiksa atau dilakukan. Angka akan berubah setelah proses ditindaklanjuti.</div>
 </section>
-
 <?php if($role==='mahasiswa'): ?>
 <?php
 $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul','revisi_judul') LIMIT 1"); $s->bind_param('i',$uid); $s->execute(); $hasActive=$s->get_result()->num_rows>0; $s->close();
