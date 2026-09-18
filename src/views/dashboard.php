@@ -6,14 +6,40 @@ $user=$_SESSION['user']; $uid=(int)$user['id']; $role=$user['role'];
   <span class="role-badge"><?=e(ucfirst($role))?></span>
 </div>
 
-<div class="card">
-  <div class="section-heading"><h2>Alur Bimbingan</h2><p class="muted">Pengajuan judul merupakan tahap awal sebelum Bab 1 sampai Bab 5.</p></div>
-  <div class="workflow">
-    <div class="workflow-step">Pengajuan Judul</div>
-    <?php for($i=1;$i<=5;$i++): ?><div class="workflow-step">Bab <?=$i?></div><?php endfor; ?>
+<section class="card research-flow-card">
+  <div class="section-heading">
+    <h2>Alur Penelitian</h2>
+    <p class="muted">Klik setiap tahap untuk melihat halaman dan status proses penelitian.</p>
   </div>
-  <div class="hint">Status <strong>Menunggu Review</strong> berarti sedang diperiksa dosen. Status <strong>Direvisi</strong> berarti mahasiswa dapat mengunggah versi berikutnya. Setelah <strong>Bab 5 disetujui</strong>, bimbingan otomatis selesai.</div>
-</div>
+  <?php
+  $flowBimbinganId=0;$flowStatus='belum_ada';
+  if($role==='mahasiswa'){
+    $fs=$conn->prepare("SELECT id,status FROM bimbingan WHERE mahasiswa_id=? ORDER BY created_at DESC LIMIT 1");
+    $fs->bind_param('i',$uid);$fs->execute();$fr=$fs->get_result()->fetch_assoc();$fs->close();
+    if($fr){$flowBimbinganId=(int)$fr['id'];$flowStatus=$fr['status'];}
+  }
+  ?>
+  <div class="research-flow">
+    <a class="research-flow-item <?=($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada')?'is-current':''?>" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
+      <span class="flow-number">01</span><span><strong>Pengajuan Judul</strong><small><?= $flowStatus==='pengajuan_judul'?'Menunggu persetujuan dosen':($flowStatus==='belum_ada'?'Belum diajukan':'Judul disetujui') ?></small></span>
+    </a>
+    <?php for($i=1;$i<=5;$i++): ?>
+      <?php
+      $flowBabStatus='Belum dimulai';
+      if($flowBimbinganId){
+        $fb=$conn->prepare("SELECT status FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=? ORDER BY versi DESC,id DESC LIMIT 1");
+        $bn='Bab '.$i;$fb->bind_param('is',$flowBimbinganId,$bn);$fb->execute();$fbr=$fb->get_result()->fetch_assoc();$fb->close();
+        if($fbr){$flowBabStatus=getStatusLabel($fbr['status']);}
+        elseif($flowStatus==='pengajuan_judul'||$flowStatus==='belum_ada'){$flowBabStatus='Menunggu judul disetujui';}
+      }
+      ?>
+      <a class="research-flow-item" href="<?= $flowBimbinganId ? '?page=bimbingan-detail&id='.$flowBimbinganId : '?page=dashboard' ?>">
+        <span class="flow-number">0<?=($i+1)?></span><span><strong>Bab <?=$i?></strong><small><?=e($flowBabStatus)?></small></span>
+      </a>
+    <?php endfor; ?>
+  </div>
+  <div class="hint">Setiap tahap membuka detail bimbingan yang sesuai. Bab berikutnya hanya dapat diproses setelah bab sebelumnya mendapat ACC.</div>
+</section>
 
 <?php if($role==='mahasiswa'): ?>
 <?php
@@ -21,13 +47,13 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 ?>
 <div class="grid-2">
 <section class="card">
-  <h2><?= $hasActive ? 'Pengajuan / Bimbingan' : 'Pengajuan Judul Skripsi' ?></h2>
+  <h2>Pengajuan Judul Skripsi</h2>
   <?php if($hasActive): ?>
     <?php $s=$conn->prepare("SELECT id,judul_skripsi,status FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul') LIMIT 1");$s->bind_param('i',$uid);$s->execute();$active=$s->get_result()->fetch_assoc();$s->close(); ?>
     <?php if($active): ?>
       <div class="meta-item"><div class="meta-label">Judul Skripsi</div><div class="meta-value"><?=e($active['judul_skripsi'])?></div></div>
       <div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><?=getStatusBadge($active['status'])?></div></div>
-      <?php if($active['status']==='pengajuan_judul'): ?><p class="muted">Judul sedang menunggu persetujuan dosen. Setelah disetujui, Bab 1 dapat diunggah.</p><?php endif; ?>
+      <?php if($active['status']==='pengajuan_judul'): ?><p class="muted">Judul sedang menunggu persetujuan dosen. Setelah disetujui, tahap Bab 1 akan terbuka.</p><?php endif; ?>
       <div class="actions"><a class="btn btn-primary" href="?page=bimbingan-detail&id=<?=$active['id']?>">Buka Detail</a></div>
     <?php endif; ?>
   <?php else: ?>
