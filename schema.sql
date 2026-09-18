@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS revisi (
  dosen_id INT NOT NULL,
  komentar TEXT NOT NULL,
  tipe_revisi ENUM('minor','major','kritis') DEFAULT 'minor',
+ file_path VARCHAR(255) NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  FOREIGN KEY (bab_id) REFERENCES bab_skripsi(id) ON DELETE CASCADE,
  FOREIGN KEY (dosen_id) REFERENCES users(id) ON DELETE CASCADE
