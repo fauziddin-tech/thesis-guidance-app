@@ -168,7 +168,7 @@ if($action==='admin_assign_dosen'){
 }
 
 if($action==='admin_bimbingan_status'){
-    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$status=$_POST['status']??'';require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->updateStatus($bid,$status);flash($r['success']?'success':'danger',$r['success']?'Status bimbingan diperbarui.':'Gagal memperbarui status.');redirect('?page=admin-dashboard');
+    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$status=$_POST['status']??'';require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->updateStatus($bid,$status);if($r['success']){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'status_bimbingan','Status bimbingan Anda telah diperbarui menjadi: '.$status.'.','?page=bimbingan-detail&id='.$bid);}flash($r['success']?'success':'danger',$r['success']?'Status bimbingan diperbarui.':'Gagal memperbarui status.');redirect('?page=admin-dashboard');
 }
 
 if($action==='mark_all_notifications_read'){
