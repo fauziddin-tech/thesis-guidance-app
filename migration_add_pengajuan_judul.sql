@@ -1,0 +1,1 @@
+ALTER TABLE bimbingan MODIFY COLUMN status ENUM('pengajuan_judul','aktif','selesai','ditangguhkan') NOT NULL DEFAULT 'pengajuan_judul';
