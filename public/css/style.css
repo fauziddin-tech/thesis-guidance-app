@@ -3,3 +3,10 @@
 .flow-content{min-width:0}
 .flow-count{position:absolute;top:14px;right:14px;display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 7px;border-radius:12px;background:#315d82;color:#fff;font-size:12px;font-weight:800;line-height:1}
 @media(max-width:900px){.research-flow{grid-template-columns:1fr}}
+
+.profile-card{max-width:700px;margin:20px auto}
+.profile-header{display:flex;align-items:center;gap:18px;margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid #e2e7eb}
+.profile-header h2{margin:0 0 4px}
+.profile-photo-wrap{width:84px;height:84px;flex:0 0 84px}
+.profile-photo{width:84px;height:84px;border-radius:50%;object-fit:cover;border:1px solid #d4dde5;background:#f1f4f6}
+.profile-photo-placeholder{display:flex;align-items:center;justify-content:center;color:#71808e;font-size:12px;font-weight:700}
