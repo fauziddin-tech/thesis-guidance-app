@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
  role ENUM('admin','dosen','mahasiswa') NOT NULL DEFAULT 'mahasiswa',
  nama_lengkap VARCHAR(150) NOT NULL,
  no_telp VARCHAR(20),
+ profile_photo VARCHAR(255) NULL,
  dosen_pembimbing_id INT NULL,
  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
