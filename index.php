@@ -43,11 +43,22 @@ if($action==='register'){
 if($action==='create_bimbingan'){
     require_role(['mahasiswa']);verify_csrf();$uid=(int)$_SESSION['user']['id'];$dosen=(int)($_POST['dosen_id']??0);$judul=trim($_POST['judul_skripsi']??'');$desc=trim($_POST['deskripsi']??'');
     if($judul===''||$dosen<1){flash('danger','Judul dan dosen wajib dipilih.');redirect('?page=dashboard');}
-    $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul') LIMIT 1");$s->bind_param('i',$uid);$s->execute();$has=$s->get_result()->num_rows>0;$s->close();
+    $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul','revisi_judul') LIMIT 1");$s->bind_param('i',$uid);$s->execute();$has=$s->get_result()->num_rows>0;$s->close();
     if($has){flash('danger','Anda masih memiliki pengajuan judul atau bimbingan aktif.');redirect('?page=dashboard');}
     $s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen' LIMIT 1");$s->bind_param('i',$dosen);$s->execute();$valid=$s->get_result()->num_rows>0;$s->close();
     if(!$valid){flash('danger','Dosen tidak valid.');redirect('?page=dashboard');}
     require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->create($uid,$dosen,$judul,$desc);flash($r['success']?'success':'danger',$r['success']?'Pengajuan judul berhasil dikirim dan menunggu persetujuan dosen.':'Pengajuan judul gagal dikirim.');redirect('?page=dashboard');
+}
+
+if($action==='revise_judul'){
+    require_role(['dosen']);verify_csrf();$uid=(int)$_SESSION['user']['id'];$bid=(int)($_POST['bimbingan_id']??0);$catatan=trim($_POST['catatan_judul']??'');
+    if($catatan===''){flash('danger','Catatan revisi judul wajib diisi.');redirect('?page=dashboard');}
+    $s=$conn->prepare("SELECT id,mahasiswa_id FROM bimbingan WHERE id=? AND dosen_id=? AND status='pengajuan_judul' LIMIT 1");$s->bind_param('ii',$bid,$uid);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();
+    if(!$r){flash('danger','Pengajuan judul tidak ditemukan atau sudah diproses.');redirect('?page=dashboard');}
+    $s=$conn->prepare("UPDATE bimbingan SET status='revisi_judul', judul_revision_catatan=?, judul_revision_at=NOW() WHERE id=?");$s->bind_param('si',$catatan,$bid);$ok=$s->execute();$s->close();
+    if($ok){notify_user($conn,(int)$r['mahasiswa_id'],'judul_direvisi','Judul skripsi perlu diperbaiki. Catatan dosen: '.$catatan,'?page=bimbingan-detail&id='.$bid);flash('success','Permintaan revisi judul berhasil dikirim.');}
+    else flash('danger','Revisi judul gagal diproses.');
+    redirect('?page=dashboard');
 }
 
 if($action==='approve_judul'){
