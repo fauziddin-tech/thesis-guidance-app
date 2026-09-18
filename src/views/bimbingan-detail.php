@@ -34,8 +34,9 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
 </div>
 
 <div class="card">
-  <div class="section-heading"><h2>Perkembangan Bab</h2><p class="muted">Dokumen ditampilkan berdasarkan urutan Bab 1 sampai Bab 5. Setiap versi tetap tersimpan sebagai riwayat.</p></div>
+  <div class="section-heading"><h2>Perkembangan Bimbingan</h2><p class="muted">Pengajuan judul harus disetujui terlebih dahulu sebelum proses Bab 1 sampai Bab 5.</p></div>
   <div class="workflow">
+    <div class="workflow-step <?= $b['status']==='aktif'?'is-approved':'' ?>">Pengajuan Judul<br><small><?=e(ucfirst(str_replace('_',' ',$b['status'])))?></small></div>
     <?php for($n=1;$n<=5;$n++): $h=$babByName['Bab '.$n]??[];$latest=$h[0]??null;$cls=$latest&&$latest['status']==='disetujui'?'is-approved':($latest?'is-current':''); ?>
       <div class="workflow-step <?=$cls?>">Bab <?=$n?><br><small><?= $latest ? e(ucfirst(str_replace('_',' ',$latest['status']))) : 'Belum diunggah' ?></small></div>
     <?php endfor; ?>
