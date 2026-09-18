@@ -71,13 +71,14 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 
 <section class="card">
   <div class="section-heading"><h2>Review dan Revisi</h2><p class="muted">Pilih versi terbaru yang berstatus Menunggu Review untuk memberikan catatan revisi.</p></div>
-  <form method="post">
+  <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="action" value="add_revision"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
     <div class="form-group"><label>Bab</label><select name="bab_id" required><option value="">Pilih bab</option><?php $s=$conn->prepare("SELECT bs.id,bs.nama_bab,bs.versi,b.id bimbingan_id,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='aktif' AND bs.status='menunggu_review' AND bs.id=(SELECT x.id FROM bab_skripsi x WHERE x.bimbingan_id=bs.bimbingan_id AND x.nama_bab=bs.nama_bab ORDER BY x.versi DESC,x.id DESC LIMIT 1) ORDER BY bs.uploaded_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();while($b=$r->fetch_assoc()): ?><option value="<?=$b['id']?>" data-bimbingan-id="<?=$b['bimbingan_id']?>"><?=e($b['nama_bab'].' v'.$b['versi'].' — '.$b['nama_lengkap'])?></option><?php endwhile;$s->close(); ?></select></div>
     <input type="hidden" name="bimbingan_id" id="revision_bimbingan_id" value="">
-    <div class="form-group"><label>Catatan Revisi</label><textarea name="komentar" required placeholder="Tuliskan bagian yang perlu diperbaiki secara jelas"></textarea></div>
+    <div class="form-group"><label>Komentar / Catatan Revisi</label><textarea name="komentar" required placeholder="Tuliskan bagian yang perlu diperbaiki secara jelas"></textarea></div>
     <div class="form-group"><label>Tipe Revisi</label><select name="tipe_revisi"><option value="minor">Minor</option><option value="major">Major</option><option value="kritis">Kritis</option></select></div>
-    <button class="btn btn-primary">Kirim Catatan Revisi</button>
+    <div class="form-group"><label>File Revisi dari Dosen</label><input type="file" name="file_revisi" accept=".pdf,.doc,.docx"><small class="muted">Opsional. Maksimal 10 MB. Dapat berupa dokumen dengan koreksi/catatan dosen.</small></div>
+    <button class="btn btn-primary">Kirim Komentar dan Revisi</button>
   </form>
 </section>
 
