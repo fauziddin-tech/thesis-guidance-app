@@ -99,27 +99,48 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
       </div>
       <?php endif; ?>
 
-      <?php if($u['role']==='dosen' && $b['status']==='pengajuan_judul'): ?>
       <div class="modal-section">
-        <form method="post">
-          <input type="hidden" name="action" value="approve_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
-          <div class="actions">
-            <button class="btn btn-success" type="submit">Setujui Judul</button>
-            <button class="btn btn-warning" type="button" data-detail-title-revision> Minta Revisi Judul</button>
-          </div>
-        </form>
-        <form method="post" id="detail-title-revision-form" style="display:none;margin-top:12px;">
-          <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
-          <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" placeholder="Tuliskan bagian judul yang perlu diperbaiki." required></textarea></div>
-          <button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
-        </form>
+        <h4>Riwayat Pengajuan & Revisi Judul</h4>
+        <?php
+        $js=$conn->prepare("SELECT jr.*,d.nama_lengkap dosen_nama FROM judul_revisi jr JOIN users d ON d.id=jr.dosen_id WHERE jr.bimbingan_id=? ORDER BY jr.id DESC");
+        $js->bind_param('i',$id);$js->execute();$titleHistory=$js->get_result()->fetch_all(MYSQLI_ASSOC);$js->close();
+        ?>
+        <?php if(!$titleHistory): ?><div class="empty-state">Belum ada riwayat revisi judul.</div>
+        <?php else: ?><div class="title-history"><?php foreach($titleHistory as $th): ?>
+          <article class="title-history-item">
+            <div class="title-history-head"><strong>Revisi Judul #<?=e($th['id'])?></strong><span><?=getStatusBadge($th['status']==='diajukan_ulang'?'menunggu_review':($th['status']==='disetujui'?'disetujui':'revisi_judul'))?></span></div>
+            <div class="detail-meta">
+              <div class="meta-item"><div class="meta-label">Judul Sebelum</div><div class="meta-value"><?=e($th['judul_sebelum'])?></div></div>
+              <?php if($th['judul_sesudah']): ?><div class="meta-item"><div class="meta-label">Judul Setelah Revisi</div><div class="meta-value"><?=e($th['judul_sesudah'])?></div></div><?php endif; ?>
+              <div class="meta-item" style="grid-column:1/-1"><div class="meta-label">Catatan Dosen</div><div class="meta-value"><?=nl2br(e($th['catatan_dosen']))?></div></div>
+              <div class="meta-item"><div class="meta-label">Diminta</div><div class="meta-value"><?=e(formatDateTime($th['requested_at']))?></div></div>
+              <?php if($th['resubmitted_at']): ?><div class="meta-item"><div class="meta-label">Diajukan Ulang</div><div class="meta-value"><?=e(formatDateTime($th['resubmitted_at']))?></div></div><?php endif; ?>
+              <?php if($th['approved_at']): ?><div class="meta-item"><div class="meta-label">Disetujui</div><div class="meta-value"><?=e(formatDateTime($th['approved_at']))?></div></div><?php endif; ?>
+            </div>
+          </article>
+        <?php endforeach; ?></div><?php endif; ?>
       </div>
-          <input type="hidden" name="action" value="approve_judul">
-          <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
-          <input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
-          <button class="btn btn-success" type="submit">Setujui Judul</button>
+
+      <?php if($u['role']==='mahasiswa' && $b['status']==='revisi_judul'): ?>
+      <div class="modal-section"><div class="review-panel">
+        <h4>Revisi Judul dari Dosen</h4><p class="muted">Perbaiki judul sesuai catatan dosen, kemudian kirim ulang untuk ditinjau.</p>
+        <div class="meta-item" style="margin-bottom:14px;"><div class="meta-label">Catatan Dosen</div><div class="meta-value"><?=nl2br(e($b['judul_revision_catatan']??'Silakan perbaiki judul sesuai arahan dosen.'))?></div></div>
+        <form method="post"><input type="hidden" name="action" value="submit_judul_revision"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+          <div class="form-group"><label>Judul Skripsi Baru</label><input name="judul_skripsi" maxlength="255" value="<?=e($b['judul_skripsi'])?>" required></div>
+          <div class="form-group"><label>Penjelasan Perubahan</label><textarea name="deskripsi"><?=e($b['deskripsi']??'')?></textarea></div>
+          <button class="btn btn-primary" type="submit">Kirim Ulang Judul</button>
         </form>
-      </div>
+      </div></div>
+      <?php endif; ?>
+
+      <?php if($u['role']==='dosen' && $b['status']==='pengajuan_judul'): ?>
+      <div class="modal-section"><form method="post">
+        <input type="hidden" name="action" value="approve_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+        <div class="actions"><button class="btn btn-success" type="submit">Setujui Judul</button><button class="btn btn-warning" type="button" data-detail-title-revision>Minta Revisi Judul</button></div>
+      </form>
+      <form method="post" id="detail-title-revision-form" style="display:none;margin-top:12px;"><input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+        <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" required></textarea></div><button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
+      </form></div>
       <?php endif; ?>
     </div>
   </div>
