@@ -26,7 +26,7 @@ if($action==='logout'){
 if($action==='login'){
     verify_csrf(); $identity=trim($_POST['identity']??''); $password=$_POST['password']??'';
     if($identity===''||$password===''){flash('danger','Username/email dan password wajib diisi.');redirect('?page=login');}
-    $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp,dosen_pembimbing_id FROM users WHERE username=? OR email=? LIMIT 1');
+    $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE username=? OR email=? LIMIT 1');
     $s->bind_param('ss',$identity,$identity);$s->execute();$user=$s->get_result()->fetch_assoc();$s->close();
     if(!$user||!password_verify($password,$user['password'])){flash('danger','Username/email atau password salah.');redirect('?page=login');}
     unset($user['password']); $_SESSION['user']=$user; session_regenerate_id(true); redirect('?page=dashboard');
