@@ -7,7 +7,7 @@ $user=$_SESSION['user'];
   <div class="profile-header">
     <div class="profile-photo-wrap">
       <?php if(!empty($user['profile_photo'])): ?>
-        <img class="profile-photo" src="<?=e($user['profile_photo'])?>" alt="Foto profil">
+        <img class="profile-photo" src="profile-photo.php" alt="Foto profil">
       <?php else: ?>
         <div class="profile-photo profile-photo-placeholder">Foto</div>
       <?php endif; ?>
