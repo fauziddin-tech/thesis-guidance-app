@@ -43,7 +43,7 @@ $user=$_SESSION['user']; $uid=(int)$user['id']; $role=$user['role'];
 
 <?php if($role==='mahasiswa'): ?>
 <?php
-$s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul') LIMIT 1"); $s->bind_param('i',$uid); $s->execute(); $hasActive=$s->get_result()->num_rows>0; $s->close();
+$s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN ('aktif','pengajuan_judul','revisi_judul') LIMIT 1"); $s->bind_param('i',$uid); $s->execute(); $hasActive=$s->get_result()->num_rows>0; $s->close();
 ?>
 <div class="grid-2">
 <section class="card">
@@ -53,7 +53,19 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
     <?php if($active): ?>
       <div class="meta-item"><div class="meta-label">Judul Skripsi</div><div class="meta-value"><?=e($active['judul_skripsi'])?></div></div>
       <div class="meta-item"><div class="meta-label">Status</div><div class="meta-value"><?=getStatusBadge($active['status'])?></div></div>
-      <?php if($active['status']==='pengajuan_judul'): ?><p class="muted">Judul sedang menunggu persetujuan dosen. Setelah disetujui, tahap Bab 1 akan terbuka.</p><?php endif; ?>
+      <?php if($active['status']==='pengajuan_judul'): ?><p class="muted">Judul sedang menunggu persetujuan dosen. Setelah disetujui, tahap Bab 1 akan terbuka.</p><?php elseif($active['status']==='revisi_judul'): ?>
+      <div class="review-panel" style="margin-top:14px;">
+        <h4>Revisi Judul dari Dosen</h4>
+        <p><?=nl2br(e($active['judul_revision_catatan']??'Silakan perbaiki judul skripsi sesuai arahan dosen.'))?></p>
+        <form method="post">
+          <input type="hidden" name="action" value="submit_judul_revision"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+          <input type="hidden" name="bimbingan_id" value="<?=e($active['id'])?>">
+          <div class="form-group"><label>Judul Skripsi Baru</label><input name="judul_skripsi" maxlength="255" value="<?=e($active['judul_skripsi'])?>" required></div>
+          <div class="form-group"><label>Penjelasan Perubahan</label><textarea name="deskripsi" placeholder="Jelaskan perubahan judul atau alasan penyesuaian."><?=e($active['deskripsi']??'')?></textarea></div>
+          <button class="btn btn-primary" type="submit">Kirim Ulang Judul</button>
+        </form>
+      </div>
+      <?php endif; ?>
       <div class="actions"><a class="btn btn-primary" href="?page=bimbingan-detail&id=<?=$active['id']?>">Buka Detail</a></div>
     <?php endif; ?>
   <?php else: ?>
@@ -151,7 +163,20 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
             <input type="hidden" name="action" value="approve_judul">
             <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
             <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
-            <button class="btn btn-success" type="submit">Setujui Judul</button>
+            <div class="actions">
+            <button class="btn btn-success" type="submit" name="decision" value="approve">Setujui Judul</button>
+            <button class="btn btn-warning" type="button" data-title-revision="<?=e($j['id'])?>">Minta Revisi Judul</button>
+          </div>
+          </form>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="4">
+          <form method="post" class="title-revision-form" id="title-revision-<?=e($j['id'])?>" style="display:none;margin-top:12px;">
+            <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+            <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
+            <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" placeholder="Tuliskan bagian judul yang perlu diperbaiki." required></textarea></div>
+            <button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
           </form>
         </td>
       </tr>
@@ -159,4 +184,9 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
     </tbody></table></div>
   <?php endif; $s->close(); ?>
 </section>
-<?php endif; ?>
+<?php endif; ?><script>
+document.addEventListener('click',function(e){
+  const b=e.target.closest('[data-title-revision]');
+  if(b){const f=document.getElementById('title-revision-'+b.dataset.titleRevision);if(f)f.style.display=f.style.display==='none'?'block':'none';}
+});
+</script>
