@@ -177,6 +177,34 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
     </tbody></table></div>
   <?php endif; $s->close(); ?>
 </section>
+<section class="card">
+  <div class="section-heading">
+    <h2>Riwayat Revisi Judul</h2>
+    <p class="muted">Riwayat permintaan revisi judul mahasiswa bimbingan, termasuk judul sebelum, catatan, pengajuan ulang, dan persetujuan.</p>
+  </div>
+  <?php
+  $s=$conn->prepare("SELECT jr.*,u.nama_lengkap mahasiswa_nama FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id WHERE jr.dosen_id=? ORDER BY jr.id DESC");
+  if($s){$s->bind_param('i',$uid);$s->execute();$titleHistoryRows=$s->get_result();$s->close();}else{$titleHistoryRows=false;}
+  ?>
+  <?php if($titleHistoryRows===false): ?>
+    <div class="empty-state">Riwayat belum dapat ditampilkan. Pastikan migration <strong>migration_add_judul_revisi_history.sql</strong> sudah dijalankan di database.</div>
+  <?php elseif(!$titleHistoryRows->num_rows): ?>
+    <div class="empty-state">Belum ada permintaan revisi judul.</div>
+  <?php else: ?>
+    <div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul Sebelum</th><th>Catatan Dosen</th><th>Status</th><th>Waktu</th><th>Detail</th></tr></thead><tbody>
+    <?php while($h=$titleHistoryRows->fetch_assoc()): ?>
+      <tr>
+        <td><strong><?=e($h['mahasiswa_nama'])?></strong></td>
+        <td><?=e($h['judul_sebelum'])?></td>
+        <td><?=e($h['catatan_dosen'])?></td>
+        <td><?=getStatusBadge($h['status'])?></td>
+        <td><?=e(formatDateTime($h['requested_at']))?></td>
+        <td><a class="btn btn-secondary" href="?page=bimbingan-detail&id=<?=e($h['bimbingan_id'])?>">Buka Detail</a></td>
+      </tr>
+    <?php endwhile; ?>
+    </tbody></table></div>
+  <?php endif; ?>
+</section>
 <?php endif; ?><script>
 document.addEventListener('click',function(e){
   const b=e.target.closest('[data-title-revision]');
