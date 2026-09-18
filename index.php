@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__.'/config/database.php';
 require_once __DIR__.'/src/helpers/Functions.php';
+require_once __DIR__.'/src/helpers/Email.php';
 
 function redirect(string $url): void { header('Location: '.$url); exit; }
 function csrf_token(): string { if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32)); return $_SESSION['csrf_token']; }
@@ -10,7 +11,7 @@ function require_login(): void { if (empty($_SESSION['user'])) redirect('?page=l
 function require_role(array $roles): void { require_login(); if (!in_array($_SESSION['user']['role']??'', $roles, true)) { http_response_code(403); exit('Akses ditolak.'); } }
 function flash(string $type,string $message): void { $_SESSION['flash']=['type'=>$type,'message'=>$message]; }
 function take_flash(): ?array { $f=$_SESSION['flash']??null; unset($_SESSION['flash']); return $f; }
-function notify_user(mysqli $conn,int $userId,string $type,string $message,?string $link=null): void { $s=$conn->prepare('INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,?,?,?)'); if($s){$s->bind_param('isss',$userId,$type,$message,$link);$s->execute();$s->close();} }
+function notify_user(mysqli $conn,int $userId,string $type,string $message,?string $link=null): void { $s=$conn->prepare('INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,?,?,?)'); if($s){$s->bind_param('isss',$userId,$type,$message,$link);$s->execute();$s->close();} send_user_email($conn,$userId,'Notifikasi MyThesis','Aktivitas pada MyThesis',$message,$link,'Lihat Aktivitas'); }
 function chapter_number(string $name): int { return preg_match('/^Bab ([1-5])$/', $name, $m) ? (int)$m[1] : 0; }
 function latest_chapter(mysqli $conn,int $bid,string $name): ?array { $s=$conn->prepare('SELECT id,nama_bab,versi,status,file_path FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=? ORDER BY versi DESC,id DESC LIMIT 1'); $s->bind_param('is',$bid,$name); $s->execute(); $row=$s->get_result()->fetch_assoc(); $s->close(); return $row?:null; }
 
@@ -29,7 +30,7 @@ if($action==='login'){
     $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE username=? OR email=? LIMIT 1');
     $s->bind_param('ss',$identity,$identity);$s->execute();$user=$s->get_result()->fetch_assoc();$s->close();
     if(!$user||!password_verify($password,$user['password'])){flash('danger','Username/email atau password salah.');redirect('?page=login');}
-    unset($user['password']); $_SESSION['user']=$user; session_regenerate_id(true); redirect('?page=dashboard');
+    unset($user['password']); $_SESSION['user']=$user; session_regenerate_id(true); send_user_email($conn,(int)$user['id'],'Login MyThesis berhasil','Login berhasil','Akun Anda baru saja digunakan untuk masuk ke MyThesis. Jika ini bukan Anda, segera ubah password dan hubungi administrator.','?page=profile','Buka Profil'); redirect('?page=dashboard');
 }
 
 if($action==='register'){
@@ -178,12 +179,12 @@ if($action==='notification_read'){
     require_login();verify_csrf();$nid=(int)($_POST['notification_id']??0);$uid=(int)$_SESSION['user']['id'];$s=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE id=? AND user_id=?');$s->bind_param('ii',$nid,$uid);$s->execute();$s->close();redirect('?page=notifications');
 }
 
-$routes=['home'=>'home.php','login'=>'login.php','register'=>'register.php','dashboard'=>'dashboard.php','profile'=>'profile.php','change-password'=>'change-password.php','bimbingan-detail'=>'bimbingan-detail.php','admin-dashboard'=>'admin-dashboard.php','notifications'=>'notifications.php','konsultasi'=>'konsultasi.php'];
+$routes=['home'=>'home.php','login'=>'login.php','register'=>'register.php','forgot-password'=>'forgot-password.php','reset-password'=>'reset-password.php','dashboard'=>'dashboard.php','profile'=>'profile.php','change-password'=>'change-password.php','bimbingan-detail'=>'bimbingan-detail.php','admin-dashboard'=>'admin-dashboard.php','notifications'=>'notifications.php','konsultasi'=>'konsultasi.php'];
 if(!isset($routes[$page]))$page='home';
 
 $viewFile=__DIR__.'/src/views/'.$routes[$page];
 $viewTitle='MyThesis';
-$pageTitles=['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard','profile'=>'Profil','change-password'=>'Ubah Password','bimbingan-detail'=>'Detail Bimbingan','admin-dashboard'=>'Administrasi Bimbingan','notifications'=>'Notifikasi','konsultasi'=>'Konsultasi'];
+$pageTitles=['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','forgot-password'=>'Lupa Password','reset-password'=>'Reset Password','dashboard'=>'Dashboard','profile'=>'Profil','change-password'=>'Ubah Password','bimbingan-detail'=>'Detail Bimbingan','admin-dashboard'=>'Administrasi Bimbingan','notifications'=>'Notifikasi','konsultasi'=>'Konsultasi'];
 if(isset($pageTitles[$page])) $viewTitle=$pageTitles[$page];
 $user=$_SESSION['user']??null;
 $unreadNotificationCount=0;
