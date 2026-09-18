@@ -10,7 +10,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
         if(!$row || !password_verify($old,$row['password'])) flash('danger','Password lama tidak sesuai.');
         else {
             $hash=password_hash($new,PASSWORD_DEFAULT); $stmt=$conn->prepare('UPDATE users SET password=? WHERE id=?'); $stmt->bind_param('si',$hash,$id); $ok=$stmt->execute(); $stmt->close();
-            flash($ok?'success':'danger',$ok?'Password berhasil diubah.':'Password gagal diubah.');
+            if($ok) send_user_email($conn,$id,'Password MyThesis diubah','Password berhasil diubah','Password akun Anda baru saja diubah. Jika ini bukan Anda, segera hubungi administrator.','?page=profile','Buka Profil'); flash($ok?'success':'danger',$ok?'Password berhasil diubah.':'Password gagal diubah.');
         }
     }
     redirect('?page=change-password');
