@@ -8,10 +8,6 @@ if (empty($_SESSION['user'])) {
 }
 
 $id = (int)($_GET['id'] ?? 0);
-if ($id < 1) {
-    http_response_code(400);
-    exit('File tidak valid.');
-}
 
 $user = $_SESSION['user'];
 $uid = (int)$user['id'];
