@@ -18,6 +18,9 @@ if (!defined('DB_HOST')) define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 if (!defined('DB_USER')) define('DB_USER', getenv('DB_USER') ?: '');
 if (!defined('DB_PASS')) define('DB_PASS', getenv('DB_PASS') ?: '');
 if (!defined('DB_NAME')) define('DB_NAME', getenv('DB_NAME') ?: '');
+if (!defined('APP_URL')) define('APP_URL', rtrim(getenv('APP_URL') ?: '', '/'));
+if (!defined('MAIL_FROM')) define('MAIL_FROM', getenv('MAIL_FROM') ?: '');
+if (!defined('MAIL_FROM_NAME')) define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'MyThesis');
 
 if (DB_USER === '' || DB_NAME === '') {
     error_log('Database configuration is incomplete. Set DB_HOST, DB_USER, DB_PASS and DB_NAME.');
