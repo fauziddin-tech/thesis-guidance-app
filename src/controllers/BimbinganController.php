@@ -34,14 +34,14 @@ class BimbinganController {
     }
 
     public function create(int $mahasiswaId, int $dosenId, string $judul, string $deskripsi): array {
-        $stmt = $this->conn->prepare("INSERT INTO bimbingan (mahasiswa_id, dosen_id, judul_skripsi, deskripsi, status) VALUES (?, ?, ?, ?, 'aktif')");
+        $stmt = $this->conn->prepare("INSERT INTO bimbingan (mahasiswa_id, dosen_id, judul_skripsi, deskripsi, status) VALUES (?, ?, ?, ?, 'pengajuan_judul')");
         $stmt->bind_param('iiss', $mahasiswaId, $dosenId, $judul, $deskripsi);
         $ok = $stmt->execute(); $id = $this->conn->insert_id; $error = $stmt->error; $stmt->close();
         return $ok ? ['success'=>true,'id'=>$id] : ['success'=>false,'error'=>$error];
     }
 
     public function updateStatus(int $bimbinganId, string $status): array {
-        if (!in_array($status, ['aktif','selesai','ditangguhkan'], true)) return ['success'=>false,'error'=>'Status tidak valid.'];
+        if (!in_array($status, ['pengajuan_judul','aktif','selesai','ditangguhkan'], true)) return ['success'=>false,'error'=>'Status tidak valid.'];
         if ($status === 'selesai') {
             $stmt = $this->conn->prepare("SELECT id FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab='Bab 5' AND status='disetujui' ORDER BY versi DESC,id DESC LIMIT 1");
             $stmt->bind_param('i', $bimbinganId); $stmt->execute();
