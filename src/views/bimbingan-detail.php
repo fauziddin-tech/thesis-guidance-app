@@ -86,6 +86,18 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
       <?php if($u['role']==='dosen' && $b['status']==='pengajuan_judul'): ?>
       <div class="modal-section">
         <form method="post">
+          <input type="hidden" name="action" value="approve_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+          <div class="actions">
+            <button class="btn btn-success" type="submit">Setujui Judul</button>
+            <button class="btn btn-warning" type="button" data-detail-title-revision> Minta Revisi Judul</button>
+          </div>
+        </form>
+        <form method="post" id="detail-title-revision-form" style="display:none;margin-top:12px;">
+          <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
+          <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" placeholder="Tuliskan bagian judul yang perlu diperbaiki." required></textarea></div>
+          <button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
+        </form>
+      </div>
           <input type="hidden" name="action" value="approve_judul">
           <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
           <input type="hidden" name="bimbingan_id" value="<?=e($id)?>">
@@ -192,6 +204,8 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const titleRevisionBtn=document.querySelector('[data-detail-title-revision]');
+  if(titleRevisionBtn){titleRevisionBtn.addEventListener('click',function(){const f=document.getElementById('detail-title-revision-form');if(f)f.style.display=f.style.display==='none'?'block':'none';});}
   const openers=document.querySelectorAll('[data-modal-target]');
   const modals=document.querySelectorAll('.modal-backdrop');
 
