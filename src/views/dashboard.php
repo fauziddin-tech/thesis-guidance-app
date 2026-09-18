@@ -140,53 +140,40 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 <section class="card">
   <div class="section-heading">
     <h2>Pengajuan Judul</h2>
-    <p class="muted">Pengajuan yang belum disetujui akan ditampilkan di sini.</p>
+    <p class="muted">Pengajuan judul yang menunggu keputusan dosen.</p>
   </div>
   <?php
-  $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.deskripsi,b.created_at,u.nama_lengkap mahasiswa_nama
+  $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.deskripsi,u.nama_lengkap mahasiswa_nama
                      FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id
                      WHERE b.dosen_id=? AND b.status='pengajuan_judul'
                      ORDER BY b.created_at ASC");
   $s->bind_param('i',$uid);$s->execute();$judulRows=$s->get_result();
   if(!$judulRows->num_rows):
   ?>
-    <div class="empty-state">Belum ada pengajuan judul yang menunggu persetujuan.</div>
+    <div class="empty-state">Belum ada pengajuan judul yang menunggu keputusan.</div>
   <?php else: ?>
     <div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul</th><th>Deskripsi</th><th>Aksi</th></tr></thead><tbody>
-      <?php while($j=$judulRows->fetch_assoc()): ?>
+    <?php while($j=$judulRows->fetch_assoc()): ?>
       <tr>
         <td><strong><?=e($j['mahasiswa_nama'])?></strong></td>
         <td><?=e($j['judul_skripsi'])?></td>
         <td><?=e($j['deskripsi']?:'-')?></td>
         <td>
           <div class="actions">
-          <form method="post" class="inline-form">
-            <input type="hidden" name="action" value="approve_judul">
-            <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
-            <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
-            <div class="actions">
-            <button class="btn btn-success" type="submit" name="decision" value="approve">Setujui Judul</button>
-            <button class="btn btn-warning" type="button" data-title-revision="<?=e($j['id'])?>">Minta Revisi Judul</button>            <form method="post" class="title-revision-form" id="title-revision-<?=e($j['id'])?>" style="display:none;margin-top:12px;">
-              <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
-              <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
-              <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" placeholder="Tuliskan bagian judul yang perlu diperbaiki." required></textarea></div>
-              <button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
+            <form method="post" class="inline-form">
+              <input type="hidden" name="action" value="approve_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
+              <button class="btn btn-success" type="submit">Setujui Judul</button>
             </form>
+            <button class="btn btn-warning" type="button" data-title-revision="<?=e($j['id'])?>">Minta Revisi Judul</button>
           </div>
-          </form>
-        </td>
-      </tr>
-      <tr>
-        <td colspan="4">
           <form method="post" class="title-revision-form" id="title-revision-<?=e($j['id'])?>" style="display:none;margin-top:12px;">
-            <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
-            <input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
+            <input type="hidden" name="action" value="revise_judul"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="bimbingan_id" value="<?=e($j['id'])?>">
             <div class="form-group"><label>Catatan Revisi Judul</label><textarea name="catatan_judul" placeholder="Tuliskan bagian judul yang perlu diperbaiki." required></textarea></div>
             <button class="btn btn-warning" type="submit">Kirim Permintaan Revisi</button>
           </form>
         </td>
       </tr>
-      <?php endwhile; ?>
+    <?php endwhile; ?>
     </tbody></table></div>
   <?php endif; $s->close(); ?>
 </section>
