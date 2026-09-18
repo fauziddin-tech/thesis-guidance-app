@@ -12,7 +12,7 @@ function formatFileSize($bytes): string {
 }
 function getStatusBadge(string $status): string {
     $map=['aktif'=>'success','selesai'=>'primary','ditangguhkan'=>'warning','draft'=>'secondary','menunggu_review'=>'info','direvisi'=>'warning','disetujui'=>'success','pending'=>'secondary','diterima'=>'success','ditolak'=>'danger'];
-    $labels=['pengajuan_judul'=>'Pengajuan Judul','revisi_judul'=>'Revisi Judul','menunggu_review'=>'Menunggu Review','disetujui'=>'Disetujui','ditangguhkan'=>'Ditangguhkan'];
+    $labels=['pengajuan_judul'=>'Pengajuan Judul','revisi_judul'=>'Revisi Judul','diminta'=>'Menunggu Revisi Judul','diajukan_ulang'=>'Diajukan Ulang','menunggu_review'=>'Menunggu Review','disetujui'=>'Disetujui','ditangguhkan'=>'Ditangguhkan'];
     $class=$map[$status]??'secondary'; $label=$labels[$status]??ucfirst(str_replace('_',' ',$status)); return '<span class="badge badge-'.$class.'">'.e($label).'</span>';
 }
 function isAuthenticated(): bool { return isset($_SESSION['user']); }
