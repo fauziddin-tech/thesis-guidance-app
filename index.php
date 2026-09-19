@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once __DIR__."/config/session.php";
+require_once __DIR__.'/src/helpers/RateLimit.php';
 require_once __DIR__.'/config/database.php';
 require_once __DIR__.'/src/helpers/Functions.php';
 require_once __DIR__.'/src/helpers/Email.php';
@@ -27,14 +28,17 @@ if($action==='logout'){
 if($action==='login'){
     verify_csrf(); $identity=trim($_POST['identity']??''); $password=$_POST['password']??'';
     if($identity===''||$password===''){flash('danger','Username/email dan password wajib diisi.');redirect('?page=login');}
-    $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE username=? OR email=? LIMIT 1');
-    $s->bind_param('ss',$identity,$identity);$s->execute();$user=$s->get_result()->fetch_assoc();$s->close();
-    if(!$user||!password_verify($password,$user['password'])){flash('danger','Username/email atau password salah.');redirect('?page=login');}
+    $rlId=rl_key($identity);$rlIp=rl_key(client_ip());
+    if(rl_count($conn,'login',$rlId,900)>=5||rl_count($conn,'login_ip',$rlIp,900)>=20){flash('danger','Terlalu banyak percobaan login. Coba lagi dalam 15 menit.');redirect('?page=login');}
+    $s=$conn->prepare('SELECT id,username,email,password,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE username=? OR email=? ORDER BY (email=?) DESC LIMIT 1');
+    $s->bind_param('sss',$identity,$identity,$identity);$s->execute();$user=$s->get_result()->fetch_assoc();$s->close();
+    if(!$user||!password_verify($password,$user['password'])){rl_hit($conn,'login',$rlId);rl_hit($conn,'login_ip',$rlIp);flash('danger','Username/email atau password salah.');redirect('?page=login');}
     unset($user['password']); $_SESSION['user']=$user; session_regenerate_id(true); send_user_email($conn,(int)$user['id'],'Login MyThesis berhasil','Login berhasil','Akun Anda baru saja digunakan untuk masuk ke MyThesis. Jika ini bukan Anda, segera ubah password dan hubungi administrator.','?page=profile','Buka Profil'); redirect('?page=dashboard');
 }
 
 if($action==='register'){
     verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$telp=trim($_POST['no_telp']??'');$dosen=(int)($_POST['dosen_pembimbing_id']??0);$password=$_POST['password']??'';$confirm=$_POST['confirm_password']??'';
+    if(strpos($username,'@')!==false){flash('danger','Username tidak boleh mengandung karakter @. Gunakan username biasa.');redirect('?page=register');}
     if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||$dosen<1||strlen($password)<8||$password!==$confirm){flash('danger','Data pendaftaran tidak valid. Password minimal 8 karakter.');redirect('?page=register');}
     $s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen' LIMIT 1");$s->bind_param('i',$dosen);$s->execute();$validDosen=$s->get_result()->num_rows>0;$s->close();if(!$validDosen){flash('danger','Dosen pembimbing tidak valid. Silakan pilih dosen yang tersedia.');redirect('?page=register');}
     $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp,dosen_pembimbing_id) VALUES(?,?,?,?,?,?,?)');$s->bind_param('ssssssi',$username,$email,$hash,$role,$nama,$telp,$dosen);
@@ -184,6 +188,9 @@ if($action==='forgot_password'){
     verify_csrf();
     $email=trim($_POST['email']??'');
     if(!filter_var($email,FILTER_VALIDATE_EMAIL)){flash('danger','Masukkan alamat email yang valid.');redirect('?page=forgot-password');}
+    $rlE=rl_key($email);$rlI=rl_key(client_ip());
+    if(rl_count($conn,'forgot',$rlE,900)>=3||rl_count($conn,'forgot_ip',$rlI,900)>=10){flash('success','Jika email terdaftar, instruksi reset password telah dikirim. Periksa inbox dan folder spam.');redirect('?page=forgot-password');}
+    rl_hit($conn,'forgot',$rlE);rl_hit($conn,'forgot_ip',$rlI);
     $s=$conn->prepare('SELECT id,nama_lengkap FROM users WHERE email=? LIMIT 1');$s->bind_param('s',$email);$s->execute();$u=$s->get_result()->fetch_assoc();$s->close();
     if($u){
         $token=bin2hex(random_bytes(32));$hash=hash('sha256',$token);

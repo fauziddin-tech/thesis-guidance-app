@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS rate_limits (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  bucket VARCHAR(50) NOT NULL,
+  rkey VARCHAR(32) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_rl (bucket, rkey, created_at)
+);

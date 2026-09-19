@@ -6,10 +6,9 @@
  * Optional: MAIL_FROM_NAME, APP_URL
  */
 function send_resend_email(string $to, string $subject, string $html): bool {
-    $apiKey = getenv('RESEND_API_KEY') ?: '';
-    $from = getenv('MAIL_FROM') ?: '';
-    $fromName = getenv('MAIL_FROM_NAME') ?: 'MyThesis';
-
+    $apiKey = defined('RESEND_API_KEY') ? RESEND_API_KEY : (getenv('RESEND_API_KEY') ?: '');
+    $from = defined('MAIL_FROM') ? MAIL_FROM : (getenv('MAIL_FROM') ?: '');
+    $fromName = defined('MAIL_FROM_NAME') ? MAIL_FROM_NAME : (getenv('MAIL_FROM_NAME') ?: 'MyThesis');
     if ($apiKey === '' || $from === '') {
         error_log('Resend email is not configured. Set RESEND_API_KEY and MAIL_FROM.');
         return false;
@@ -74,7 +73,7 @@ function send_user_email(mysqli $conn, int $userId, string $subject, string $tit
     if ($link) {
         $url = $link;
         if (preg_match('#^https?://#i', $url) !== 1) {
-            $base = rtrim(getenv('APP_URL') ?: '', '/');
+            $base = rtrim((defined('APP_URL') && APP_URL !== '') ? APP_URL : (getenv('APP_URL') ?: 'https://mythesis.my.id'), '/');
             if ($base !== '') $url = $base . '/' . ltrim($url, '/');
         }
         $button = '<p style="margin:24px 0"><a href="' . email_escape($url) . '" style="display:inline-block;padding:10px 16px;background:#315d82;color:#fff;text-decoration:none;border-radius:5px;font-weight:700">' . email_escape($buttonText ?: 'Buka MyThesis') . '</a></p>';

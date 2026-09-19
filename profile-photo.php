@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__."/config/session.php";
 require_once __DIR__.'/config/database.php';
 
 if (empty($_SESSION['user']['id'])) {
@@ -37,5 +37,6 @@ if (!in_array($mime,$allowed,true)) {
 
 header('Content-Type: '.$mime);
 header('Content-Length: '.filesize($file));
+header('X-Content-Type-Options: nosniff');
 header('Cache-Control: private, max-age=3600');
 readfile($file);
