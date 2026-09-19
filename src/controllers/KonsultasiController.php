@@ -2,11 +2,19 @@
 class KonsultasiController {
     private mysqli $conn;
     public function __construct(mysqli $connection) { $this->conn=$connection; }
-    public function getForUser(int $userId,string $role): array {
+    public function getForUser(int $userId,string $role,string $search='',int $limit=10,int $offset=0): array {
+        $limit=max(1,min(50,$limit));$offset=max(0,$offset);$like='%'.$search.'%';
         $sql=$role==='mahasiswa'
-            ? "SELECT k.*,b.judul_skripsi,d.nama_lengkap AS dosen_nama FROM konsultasi k JOIN bimbingan b ON b.id=k.bimbingan_id JOIN users d ON d.id=b.dosen_id WHERE b.mahasiswa_id=? ORDER BY k.created_at DESC"
-            : "SELECT k.*,b.judul_skripsi,m.nama_lengkap AS mahasiswa_nama FROM konsultasi k JOIN bimbingan b ON b.id=k.bimbingan_id JOIN users m ON m.id=b.mahasiswa_id WHERE b.dosen_id=? ORDER BY k.created_at DESC";
-        $s=$this->conn->prepare($sql);$s->bind_param('i',$userId);$s->execute();$rows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();return $rows;
+            ? "SELECT k.*,b.judul_skripsi,d.nama_lengkap AS dosen_nama FROM konsultasi k JOIN bimbingan b ON b.id=k.bimbingan_id JOIN users d ON d.id=b.dosen_id WHERE b.mahasiswa_id=? AND (k.topik LIKE ? OR k.deskripsi LIKE ? OR d.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ?) ORDER BY k.created_at DESC,k.id DESC LIMIT ? OFFSET ?"
+            : "SELECT k.*,b.judul_skripsi,m.nama_lengkap AS mahasiswa_nama FROM konsultasi k JOIN bimbingan b ON b.id=k.bimbingan_id JOIN users m ON m.id=b.mahasiswa_id WHERE b.dosen_id=? AND (k.topik LIKE ? OR k.deskripsi LIKE ? OR m.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ?) ORDER BY k.created_at DESC,k.id DESC LIMIT ? OFFSET ?";
+        $s=$this->conn->prepare($sql);$s->bind_param('issssii',$userId,$like,$like,$like,$like,$limit,$offset);$s->execute();$rows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();return $rows;
+    }
+    public function countForUser(int $userId,string $role,string $search=''): int {
+        $like='%'.$search.'%';
+        $sql=$role==='mahasiswa'
+            ? "SELECT COUNT(*) total FROM konsultasi k JOIN bimbingan b ON b.id=k.bimbingan_id JOIN users d ON d.id=b.dosen_id WHERE b.mahasiswa_id=? AND (k.topik LIKE ? OR k.deskripsi LIKE ? OR d.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ?)"
+            : "SELECT COUNT(*) total FROM konsultasi k JOIN bimbingan b ON b.id=k.bimbingan_id JOIN users m ON m.id=b.mahasiswa_id WHERE b.dosen_id=? AND (k.topik LIKE ? OR k.deskripsi LIKE ? OR m.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ?)";
+        $s=$this->conn->prepare($sql);$s->bind_param('issss',$userId,$like,$like,$like,$like);$s->execute();$total=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();return $total;
     }
     public function create(int $studentId,int $bimbinganId,string $topik,string $deskripsi): bool {
         if($topik==='')return false;$s=$this->conn->prepare("SELECT id FROM bimbingan WHERE id=? AND mahasiswa_id=? AND status='aktif'");$s->bind_param('ii',$bimbinganId,$studentId);$s->execute();$valid=(bool)$s->get_result()->num_rows;$s->close();if(!$valid)return false;
