@@ -43,6 +43,10 @@ $r=$conn->query("SELECT u.id,u.nama_lengkap,u.username,u.email,u.no_telp,
                  FROM users u WHERE u.role='dosen' ORDER BY u.nama_lengkap ASC");
 if($r) $dosenRows=$r->fetch_all(MYSQLI_ASSOC);
 
+$accountRows=[];
+$r=$conn->query("SELECT id,username,email,role,nama_lengkap,created_at FROM users ORDER BY created_at DESC,id DESC");
+if($r) $accountRows=$r->fetch_all(MYSQLI_ASSOC);
+
 $old=$_SESSION['old_dosen_form']??[];
 unset($_SESSION['old_dosen_form']);
 
@@ -201,14 +205,14 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
       <p class="muted">Hapus akun mahasiswa atau dosen beserta data bimbingan dan file terkait.</p>
     </div>
   </div>
-  <?php if(!$users): ?>
+  <?php if(!$accountRows): ?>
     <div class="empty-state">Belum ada akun pengguna.</div>
   <?php else: ?>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Dibuat</th><th>Aksi</th></tr></thead>
         <tbody>
-        <?php foreach($users as $u): ?>
+        <?php foreach($accountRows as $u): ?>
           <tr>
             <td><strong><?=e($u['nama_lengkap'])?></strong><br><small class="muted"><?=e($u['username'])?></small></td>
             <td><?=e($u['email'])?></td>
