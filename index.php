@@ -175,6 +175,29 @@ if($action==='admin_bimbingan_status'){
     require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$status=$_POST['status']??'';require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->updateStatus($bid,$status);if($r['success']){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'status_bimbingan','Status bimbingan Anda telah diperbarui menjadi: '.$status.'.','?page=bimbingan-detail&id='.$bid);}flash($r['success']?'success':'danger',$r['success']?'Status bimbingan diperbarui.':'Gagal memperbarui status.');redirect('?page=admin-dashboard');
 }
 
+if($action==='admin_create_dosen'){
+    require_role(['admin']);verify_csrf();
+    $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$telp=trim($_POST['no_telp']??'');$password=(string)($_POST['password']??'');$confirm=(string)($_POST['confirm_password']??'');
+    $_SESSION['old_dosen_form']=['username'=>$username,'email'=>$email,'nama_lengkap'=>$nama,'no_telp'=>$telp];
+    $formError=null;
+    if($nama===''||strlen($nama)>150) $formError='Nama lengkap wajib diisi (maksimal 150 karakter).';
+    elseif(!preg_match('/^[A-Za-z0-9._-]{3,50}$/',$username)) $formError='Username 3–50 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau strip.';
+    elseif(strlen($email)>100||!filter_var($email,FILTER_VALIDATE_EMAIL)) $formError='Alamat email tidak valid.';
+    elseif($telp!==''&&!preg_match('/^[0-9+\-\s()]{5,15}$/',$telp)) $formError='No. telepon tidak valid.';
+    elseif(strlen($password)<8||strlen($password)>72) $formError='Password harus 8–72 karakter.';
+    elseif($password!==$confirm) $formError='Konfirmasi password tidak cocok.';
+    if($formError!==null){flash('danger',$formError);redirect('?page=admin-dashboard#tambah-dosen');}
+    require_once __DIR__.'/src/controllers/UserController.php';$ctrl=new UserController($conn);$r=$ctrl->create($username,$email,$nama,$password,'dosen',$telp);
+    if(!empty($r['success'])){
+        unset($_SESSION['old_dosen_form']);
+        $mailed=send_user_email($conn,(int)$r['id'],'Akun dosen MyThesis dibuat','Akun dosen Anda telah dibuat','Administrator telah membuatkan akun dosen untuk Anda di MyThesis. Username Anda: '.$username.'. Password awal disampaikan terpisah oleh administrator. Setelah masuk, segera ubah password Anda melalui menu profil.','?page=login','Masuk ke MyThesis');
+        flash('success','Akun dosen "'.$nama.'" berhasil dibuat.'.($mailed?' Email pemberitahuan telah dikirim.':' Email pemberitahuan tidak terkirim, sampaikan username dan password awal langsung kepada dosen.'));
+    }else{
+        flash('danger',($r['error']??'')==='Username atau email sudah terdaftar.'?'Username atau email sudah terdaftar.':'Akun dosen gagal dibuat. Silakan coba lagi.');
+    }
+    redirect('?page=admin-dashboard#tambah-dosen');
+}
+
 if($action==='mark_all_notifications_read'){
     require_login();verify_csrf();$uid=(int)$_SESSION['user']['id'];$s=$conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE user_id=? AND dibaca=0');if($s){$s->bind_param('i',$uid);$s->execute();$s->close();}redirect('?page=notifications');
 }
