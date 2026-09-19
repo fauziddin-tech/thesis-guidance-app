@@ -93,7 +93,7 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
 .admin-progress{min-width:90px}
 .admin-progress-track{height:7px;background:#e9edf0;border-radius:5px;overflow:hidden;margin-top:7px}
 .admin-progress-bar{height:100%;background:#315d82}
-.account-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:end;margin:16px 0}.account-toolbar label{font-weight:600;font-size:14px}.account-search-row{display:flex;gap:8px;align-items:center}.account-search-row input{min-width:300px}.account-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #e6ebef}.account-pagination-info{color:#687684;font-size:13px}.account-pagination-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.account-pagination-controls select{min-width:72px}@media(max-width:700px){.account-toolbar{display:block}.account-search-row{margin-top:8px}.account-search-row input{min-width:0;flex:1}.account-pagination{display:block}.account-pagination-controls{margin-top:10px}}
+.account-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:end;margin:16px 0}.account-search{display:flex;gap:8px;align-items:end}.account-search label,.account-limit label{font-weight:600;font-size:14px;display:block;margin-bottom:6px}.account-search-row{display:flex;gap:8px;align-items:center}.account-search-row input{min-width:300px}.account-limit{min-width:150px}.account-limit select{width:100%}.account-pagination{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:14px;padding-top:14px;border-top:1px solid #e6ebef}.account-pagination-info{color:#687684;font-size:13px}.account-pagination-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.account-page-link{display:inline-flex;align-items:center;justify-content:center;min-width:36px;height:36px;padding:0 10px;border:1px solid #d5dde4;border-radius:6px;background:#fff;color:#334e68;text-decoration:none;font-size:14px}.account-page-link:hover{background:#f5f8fa}.account-page-link.active{background:#315d82;color:#fff;border-color:#315d82;font-weight:600}.account-page-link.disabled{color:#9aa6b2;background:#f5f7f8;pointer-events:none}.account-page-ellipsis{padding:0 4px;color:#687684}@media(max-width:700px){.account-toolbar{display:block}.account-search-row{margin-top:0}.account-search-row input{min-width:0;flex:1}.account-limit{margin-top:12px;max-width:150px}.account-pagination{display:block}.account-pagination-controls{margin-top:10px}}
 @media(max-width:1050px){.admin-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-layout{grid-template-columns:1fr}.admin-table-actions{min-width:190px}}
 @media(max-width:640px){.admin-summary{grid-template-columns:1fr}.admin-table-actions form{align-items:stretch;flex-direction:column}.admin-table-actions select,.admin-table-actions .btn{width:100%}}
 </style>
@@ -221,12 +221,23 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
   </div>
   <form method="get" class="account-toolbar">
     <input type="hidden" name="page" value="admin-dashboard">
-    <input type="hidden" name="account_limit" value="<?=e($accountLimit)?>">
-    <label for="account_q">Cari berdasarkan nama</label>
-    <div class="account-search-row">
-      <input id="account_q" name="account_q" type="search" value="<?=e($accountSearch)?>" placeholder="Masukkan nama lengkap">
-      <button class="btn btn-secondary" type="submit">Cari</button>
-      <?php if($accountSearch!==''): ?><a class="btn btn-secondary" href="?page=admin-dashboard#manajemen-akun">Reset</a><?php endif; ?>
+    <div class="account-search">
+      <div>
+        <label for="account_q">Cari berdasarkan nama</label>
+        <div class="account-search-row">
+          <input id="account_q" name="account_q" type="search" value="<?=e($accountSearch)?>" placeholder="Masukkan nama lengkap">
+          <button class="btn btn-secondary" type="submit">Cari</button>
+          <?php if($accountSearch!==''): ?><a class="btn btn-secondary" href="?page=admin-dashboard#manajemen-akun">Reset</a><?php endif; ?>
+        </div>
+      </div>
+    </div>
+    <div class="account-limit">
+      <label for="account_limit_top">Tampilkan</label>
+      <select id="account_limit_top" name="account_limit" onchange="this.form.submit()">
+        <option value="10" <?=$accountLimit===10?'selected':''?>>10</option>
+        <option value="20" <?=$accountLimit===20?'selected':''?>>20</option>
+        <option value="50" <?=$accountLimit===50?'selected':''?>>50</option>
+      </select>
     </div>
   </form>
   <?php if(!$accountRows): ?>
@@ -259,19 +270,24 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
         </tbody>
       </table>
     </div>
+    <?php
+      $pageNumbers=[1];
+      $start=max(2,$accountPage-2);
+      $end=min($accountTotalPages-1,$accountPage+2);
+      for($p=$start;$p<=$end;$p++) $pageNumbers[]=$p;
+      if($accountTotalPages>1) $pageNumbers[]=$accountTotalPages;
+      $pageNumbers=array_values(array_unique($pageNumbers));
+    ?>
     <div class="account-pagination">
       <div class="account-pagination-info">Menampilkan <?=e($accountTotal ? $accountOffset+1 : 0)?>–<?=e(min($accountOffset+$accountLimit,$accountTotal))?> dari <?=e($accountTotal)?> akun</div>
       <div class="account-pagination-controls">
-        <label for="account_limit_bottom">Tampilkan</label>
-        <select id="account_limit_bottom" onchange="window.location.href='?page=admin-dashboard&amp;account_q='+encodeURIComponent(<?=json_encode($accountSearch)?>)+'&amp;account_limit='+this.value+'&amp;account_page=1#manajemen-akun'">
-          <option value="10" <?=$accountLimit===10?'selected':''?>>10</option>
-          <option value="20" <?=$accountLimit===20?'selected':''?>>20</option>
-          <option value="50" <?=$accountLimit===50?'selected':''?>>50</option>
-        </select>
-        <span>per halaman</span>
-        <?php if($accountPage>1): ?><a class="btn btn-secondary" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$accountPage-1?>#manajemen-akun">Sebelumnya</a><?php endif; ?>
-        <span>Halaman <?=e($accountPage)?> / <?=e($accountTotalPages)?></span>
-        <?php if($accountPage<$accountTotalPages): ?><a class="btn btn-secondary" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$accountPage+1?>#manajemen-akun">Berikutnya</a><?php endif; ?>
+        <?php if($accountPage>1): ?><a class="account-page-link" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$accountPage-1?>#manajemen-akun">‹ Sebelumnya</a><?php else: ?><span class="account-page-link disabled">‹ Sebelumnya</span><?php endif; ?>
+        <?php $previousPage=0; foreach($pageNumbers as $p): ?>
+          <?php if($previousPage && $p>$previousPage+1): ?><span class="account-page-ellipsis">…</span><?php endif; ?>
+          <?php if($p===$accountPage): ?><span class="account-page-link active" aria-current="page"><?=$p?></span><?php else: ?><a class="account-page-link" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$p?>#manajemen-akun"><?=$p?></a><?php endif; ?>
+          <?php $previousPage=$p; ?>
+        <?php endforeach; ?>
+        <?php if($accountPage<$accountTotalPages): ?><a class="account-page-link" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$accountPage+1?>#manajemen-akun">Berikutnya ›</a><?php else: ?><span class="account-page-link disabled">Berikutnya ›</span><?php endif; ?>
       </div>
     </div>
   <?php endif; ?>
