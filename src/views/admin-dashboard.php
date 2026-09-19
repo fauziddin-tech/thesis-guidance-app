@@ -37,11 +37,21 @@ $dosen=[];
 $r=$conn->query("SELECT id,nama_lengkap,email FROM users WHERE role='dosen' ORDER BY nama_lengkap ASC");
 if($r) $dosen=$r->fetch_all(MYSQLI_ASSOC);
 
-$dosenRows=[];
-$r=$conn->query("SELECT u.id,u.nama_lengkap,u.username,u.email,u.no_telp,
-                        (SELECT COUNT(*) FROM bimbingan b WHERE b.dosen_id=u.id) AS total_bimbingan
-                 FROM users u WHERE u.role='dosen' ORDER BY u.nama_lengkap ASC");
-if($r) $dosenRows=$r->fetch_all(MYSQLI_ASSOC);
+$dosenSearch=trim($_GET['dosen_q']??'');
+$dosenLimit=(int)($_GET['dosen_limit']??10); if(!in_array($dosenLimit,[10,20,50],true)) $dosenLimit=10;
+$dosenPage=max(1,(int)($_GET['dosen_page']??1)); $dosenOffset=($dosenPage-1)*$dosenLimit; $dosenTotal=0;$dosenRows=[];
+if($dosenSearch!==''){
+    $like='%'.$dosenSearch.'%';
+    $s=$conn->prepare("SELECT COUNT(*) total FROM users WHERE role='dosen' AND (nama_lengkap LIKE ? OR username LIKE ? OR email LIKE ? OR no_telp LIKE ?)");
+    $s->bind_param('ssss',$like,$like,$like,$like);$s->execute();$dosenTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT u.id,u.nama_lengkap,u.username,u.email,u.no_telp,(SELECT COUNT(*) FROM bimbingan b WHERE b.dosen_id=u.id) AS total_bimbingan FROM users u WHERE u.role='dosen' AND (u.nama_lengkap LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.no_telp LIKE ?) ORDER BY u.nama_lengkap ASC,u.id ASC LIMIT ? OFFSET ?");
+    $s->bind_param('ssssii',$like,$like,$like,$like,$dosenLimit,$dosenOffset);$s->execute();$dosenRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+}else{
+    $r=$conn->query("SELECT COUNT(*) total FROM users WHERE role='dosen'");if($r)$dosenTotal=(int)($r->fetch_assoc()['total']??0);
+    $s=$conn->prepare("SELECT u.id,u.nama_lengkap,u.username,u.email,u.no_telp,(SELECT COUNT(*) FROM bimbingan b WHERE b.dosen_id=u.id) AS total_bimbingan FROM users u WHERE u.role='dosen' ORDER BY u.nama_lengkap ASC,u.id ASC LIMIT ? OFFSET ?");
+    $s->bind_param('ii',$dosenLimit,$dosenOffset);$s->execute();$dosenRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+}
+$dosenTotalPages=max(1,(int)ceil($dosenTotal/$dosenLimit)); if($dosenPage>$dosenTotalPages){$dosenPage=$dosenTotalPages;$dosenOffset=($dosenPage-1)*$dosenLimit;}
 
 $accountSearch=trim($_GET['account_q']??'');
 $accountLimit=(int)($_GET['account_limit']??10);
@@ -63,17 +73,22 @@ if($accountPage>$accountTotalPages){$accountPage=$accountTotalPages;$accountOffs
 $old=$_SESSION['old_dosen_form']??[];
 unset($_SESSION['old_dosen_form']);
 
-$bimbingan=[];
-$r=$conn->query("SELECT b.id,b.judul_skripsi,b.status,b.updated_at,b.dosen_id,
-                        m.nama_lengkap mahasiswa_nama,
-                        d.nama_lengkap dosen_nama,
-                        (SELECT COUNT(*) FROM bab_skripsi bs WHERE bs.bimbingan_id=b.id AND bs.status='disetujui' AND bs.nama_bab IN ('Bab 1','Bab 2','Bab 3','Bab 4','Bab 5')) AS bab_disetujui
-                 FROM bimbingan b
-                 JOIN users m ON m.id=b.mahasiswa_id
-                 JOIN users d ON d.id=b.dosen_id
-                 ORDER BY b.updated_at DESC,b.id DESC
-                 LIMIT 30");
-if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
+$bimbinganSearch=trim($_GET['bimbingan_q']??'');
+$bimbinganLimit=(int)($_GET['bimbingan_limit']??10); if(!in_array($bimbinganLimit,[10,20,50],true)) $bimbinganLimit=10;
+$bimbinganPage=max(1,(int)($_GET['bimbingan_page']??1)); $bimbinganOffset=($bimbinganPage-1)*$bimbinganLimit; $bimbinganTotal=0;$bimbingan=[];
+$baseB=" FROM bimbingan b JOIN users m ON m.id=b.mahasiswa_id JOIN users d ON d.id=b.dosen_id";
+if($bimbinganSearch!==''){
+    $like='%'.$bimbinganSearch.'%';
+    $s=$conn->prepare("SELECT COUNT(*) total".$baseB." WHERE m.nama_lengkap LIKE ? OR d.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ? OR b.status LIKE ?");
+    $s->bind_param('ssss',$like,$like,$like,$like);$s->execute();$bimbinganTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.status,b.updated_at,b.dosen_id,m.nama_lengkap mahasiswa_nama,d.nama_lengkap dosen_nama,(SELECT COUNT(*) FROM bab_skripsi bs WHERE bs.bimbingan_id=b.id AND bs.status='disetujui' AND bs.nama_bab IN ('Bab 1','Bab 2','Bab 3','Bab 4','Bab 5')) AS bab_disetujui".$baseB." WHERE m.nama_lengkap LIKE ? OR d.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ? OR b.status LIKE ? ORDER BY b.updated_at DESC,b.id DESC LIMIT ? OFFSET ?");
+    $s->bind_param('ssssii',$like,$like,$like,$like,$bimbinganLimit,$bimbinganOffset);$s->execute();$bimbingan=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+}else{
+    $r=$conn->query("SELECT COUNT(*) total".$baseB);if($r)$bimbinganTotal=(int)($r->fetch_assoc()['total']??0);
+    $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.status,b.updated_at,b.dosen_id,m.nama_lengkap mahasiswa_nama,d.nama_lengkap dosen_nama,(SELECT COUNT(*) FROM bab_skripsi bs WHERE bs.bimbingan_id=b.id AND bs.status='disetujui' AND bs.nama_bab IN ('Bab 1','Bab 2','Bab 3','Bab 4','Bab 5')) AS bab_disetujui".$baseB." ORDER BY b.updated_at DESC,b.id DESC LIMIT ? OFFSET ?");
+    $s->bind_param('ii',$bimbinganLimit,$bimbinganOffset);$s->execute();$bimbingan=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+}
+$bimbinganTotalPages=max(1,(int)ceil($bimbinganTotal/$bimbinganLimit)); if($bimbinganPage>$bimbinganTotalPages){$bimbinganPage=$bimbinganTotalPages;$bimbinganOffset=($bimbinganPage-1)*$bimbinganLimit;}
 ?>
 
 <style>
@@ -163,16 +178,21 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
 </div>
 
 <div class="admin-layout" id="tambah-dosen">
-  <section class="card">
+  <section class="card" id="daftar-dosen">
     <div class="section-heading">
       <div>
-        <h2>Daftar Dosen</h2>
+        <h2>Daftar Dosen</h2
         <p class="muted">Akun dosen yang dapat dipilih sebagai pembimbing.</p>
       </div>
     </div>
     <?php if(!$dosenRows): ?>
       <div class="empty-state">Belum ada akun dosen. Tambahkan lewat formulir di samping.</div>
     <?php else: ?>
+      <form method="get" class="account-toolbar">
+        <input type="hidden" name="page" value="admin-dashboard"><input type="hidden" name="dosen_page" value="1">
+        <div class="account-search"><div><label for="dosen_q">Cari dosen</label><div class="account-search-row"><input id="dosen_q" name="dosen_q" type="search" value="<?=e($dosenSearch)?>" placeholder="Nama, username, email, atau telepon"><button class="btn btn-secondary" type="submit">Cari</button><?php if($dosenSearch!==''): ?><a class="btn btn-secondary" href="?page=admin-dashboard#daftar-dosen">Reset</a><?php endif; ?></div></div></div>
+        <div class="account-limit"><label for="dosen_limit_top">Tampilkan</label><select id="dosen_limit_top" name="dosen_limit" onchange="this.form.submit()"><option value="10" <?=$dosenLimit===10?'selected':''?>>10</option><option value="20" <?=$dosenLimit===20?'selected':''?>>20</option><option value="50" <?=$dosenLimit===50?'selected':''?>>50</option></select></div>
+      </form>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Nama</th><th>Username</th><th>Kontak</th><th>Bimbingan</th></tr></thead>
@@ -188,6 +208,7 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
           </tbody>
         </table>
       </div>
+      <?=render_pagination($dosenPage,$dosenTotalPages,$dosenTotal,$dosenOffset,$dosenLimit,['page'=>'admin-dashboard','dosen_q'=>$dosenSearch,'dosen_limit'=>$dosenLimit],'dosen_page','#daftar-dosen','dosen')?>
     <?php endif; ?>
   </section>
 
@@ -243,6 +264,11 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
   <?php if(!$accountRows): ?>
     <div class="empty-state">Belum ada akun pengguna.</div>
   <?php else: ?>
+    <form method="get" class="account-toolbar">
+      <input type="hidden" name="page" value="admin-dashboard"><input type="hidden" name="bimbingan_page" value="1">
+      <div class="account-search"><div><label for="bimbingan_q">Cari bimbingan</label><div class="account-search-row"><input id="bimbingan_q" name="bimbingan_q" type="search" value="<?=e($bimbinganSearch)?>" placeholder="Mahasiswa, dosen, judul, atau status"><button class="btn btn-secondary" type="submit">Cari</button><?php if($bimbinganSearch!==''): ?><a class="btn btn-secondary" href="?page=admin-dashboard#manajemen-bimbingan">Reset</a><?php endif; ?></div></div></div>
+      <div class="account-limit"><label for="bimbingan_limit_top">Tampilkan</label><select id="bimbingan_limit_top" name="bimbingan_limit" onchange="this.form.submit()"><option value="10" <?=$bimbinganLimit===10?'selected':''?>>10</option><option value="20" <?=$bimbinganLimit===20?'selected':''?>>20</option><option value="50" <?=$bimbinganLimit===50?'selected':''?>>50</option></select></div>
+    </form>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Dibuat</th><th>Aksi</th></tr></thead>
@@ -294,10 +320,10 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
   <?php endif; ?>
 </section>
 
-<section class="card">
+<section class="card" id="manajemen-bimbingan">
   <div class="section-heading">
     <div>
-      <h2>Manajemen Bimbingan</h2>
+      <h2>Manajemen Bimbingan</h2
       <p class="muted">Pantau seluruh mahasiswa, dosen pembimbing, progres Bab 1–5, dan status bimbingan.</p>
     </div>
   </div>
@@ -363,6 +389,7 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
         </tbody>
       </table>
     </div>
+    <?=render_pagination($bimbinganPage,$bimbinganTotalPages,$bimbinganTotal,$bimbinganOffset,$bimbinganLimit,['page'=>'admin-dashboard','bimbingan_q'=>$bimbinganSearch,'bimbingan_limit'=>$bimbinganLimit],'bimbingan_page','#manajemen-bimbingan','bimbingan')?>
   <?php endif; ?>
 </section>
 
