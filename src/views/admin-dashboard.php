@@ -194,6 +194,46 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
   </section>
 </div>
 
+<section class="card" style="margin-top:18px" id="manajemen-akun">
+  <div class="section-heading">
+    <div>
+      <h2>Manajemen Akun</h2>
+      <p class="muted">Hapus akun mahasiswa atau dosen beserta data bimbingan dan file terkait.</p>
+    </div>
+  </div>
+  <?php if(!$users): ?>
+    <div class="empty-state">Belum ada akun pengguna.</div>
+  <?php else: ?>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+        <tbody>
+        <?php foreach($users as $u): ?>
+          <tr>
+            <td><strong><?=e($u['nama_lengkap'])?></strong><br><small class="muted"><?=e($u['username'])?></small></td>
+            <td><?=e($u['email'])?></td>
+            <td><?=e(ucfirst($u['role']))?></td>
+            <td><?=e(formatDate($u['created_at']))?></td>
+            <td>
+              <?php if((int)$u['id']===$uid): ?>
+                <span class="muted">Akun aktif</span>
+              <?php else: ?>
+                <form method="post" onsubmit="return confirm('Hapus akun <?=e($u['nama_lengkap'])?>? Data bimbingan, revisi, notifikasi, dan file terkait akun ini juga akan dihapus. Tindakan ini tidak dapat dibatalkan.');">
+                  <input type="hidden" name="action" value="admin_delete_user">
+                  <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+                  <input type="hidden" name="user_id" value="<?=e($u['id'])?>">
+                  <button class="btn btn-danger" type="submit">Hapus Akun</button>
+                </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+</section>
+
 <section class="card">
   <div class="section-heading">
     <div>
