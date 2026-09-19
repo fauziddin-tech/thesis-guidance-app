@@ -5,7 +5,11 @@ $ns=$conn->prepare("SELECT COUNT(*) total FROM notifikasi WHERE user_id=? AND di
 if($ns){$ns->bind_param('i',$uid);$ns->execute();$unreadCount=(int)($ns->get_result()->fetch_assoc()['total']??0);$ns->close();}
 ?>
 <div class="page-head">
-  <div><h1>Dashboard</h1><p class="muted">Ringkasan bimbingan dan perkembangan skripsi Anda.</p></div>
+  <div><h1>Dashboard</h1><p class="muted">Ringkasan bimbingan dan perkembangan skripsi Anda.</p>
+  <div class="dashboard-refresh" data-dashboard-refresh>
+    <button class="btn btn-secondary" type="button" data-refresh-now>Muat Ulang</button>
+    <span class="dashboard-refresh-status" data-refresh-status>Memuat ulang otomatis dalam <strong data-refresh-countdown>20</strong> detik.</span>
+  </div></div>
   <span class="role-badge"><?=e(ucfirst($role))?></span>
 </div>
 
@@ -259,4 +263,34 @@ document.addEventListener('click',function(e){
   const b=e.target.closest('[data-title-revision]');
   if(b){const f=document.getElementById('title-revision-'+b.dataset.titleRevision);if(f)f.style.display=f.style.display==='none'?'block':'none';}
 });
+</script>
+<script>
+(function(){
+  const root=document.querySelector('[data-dashboard-refresh]');
+  if(!root) return;
+  const countdown=root.querySelector('[data-refresh-countdown]');
+  const status=root.querySelector('[data-refresh-status]');
+  const button=root.querySelector('[data-refresh-now]');
+  const intervalSeconds=20;
+  let remaining=intervalSeconds;
+  let timer=null;
+  function update(){
+    if(countdown) countdown.textContent=remaining;
+  }
+  function refreshNow(){
+    if(button){button.disabled=true;button.textContent='Memuat Ulang...';}
+    if(status) status.textContent='Memuat ulang halaman...';
+    window.location.reload();
+  }
+  if(button) button.addEventListener('click',refreshNow);
+  update();
+  timer=setInterval(function(){
+    remaining--;
+    update();
+    if(remaining<=0){
+      clearInterval(timer);
+      refreshNow();
+    }
+  },1000);
+})();
 </script>
