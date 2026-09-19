@@ -254,7 +254,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
           </form>
         </td>
       </tr>
-    <?php endwhile; ?>
+    <?php endforeach; ?>
     </tbody></table></div>
     <?=render_pagination($judulPage,$judulTotalPages,$judulTotal,$judulOffset,$judulLimit,['page'=>'dashboard','judul_q'=>$judulSearch,'judul_limit'=>$judulLimit],'judul_page','#pengajuan-judul','pengajuan judul')?>
   <?php endif; ?>
@@ -302,7 +302,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
         <td><?=e(formatDateTime($h['requested_at']))?></td>
         <td><a class="btn btn-secondary" href="?page=bimbingan-detail&id=<?=e($h['bimbingan_id'])?>">Buka Detail</a></td>
       </tr>
-    <?php endwhile; ?>
+    <?php endforeach; ?>
     </tbody></table></div>
     <?=render_pagination($historyPage,$historyTotalPages,$historyTotal,$historyOffset,$historyLimit,['page'=>'dashboard','history_q'=>$historySearch,'history_limit'=>$historyLimit],'history_page','#riwayat-revisi-judul','riwayat revisi judul')?>
   <?php endif; ?>
