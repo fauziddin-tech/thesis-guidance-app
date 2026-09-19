@@ -257,7 +257,8 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
               <?php if((int)$u['id']===$uid): ?>
                 <span class="muted">Akun aktif</span>
               <?php else: ?>
-                <form method="post" onsubmit="return confirm('Hapus akun <?=e($u['nama_lengkap'])?>? Data bimbingan, revisi, notifikasi, dan file terkait akun ini juga akan dihapus. Tindakan ini tidak dapat dibatalkan.');">
+                <?php if($u['role']==='mahasiswa'): ?><div style="margin-bottom:8px"><?=impersonate_form((int)$u['id'],(string)$u['nama_lengkap'])?></div><?php endif; ?>
+                <form method="post" onsubmit="return confirm(<?=e(json_encode('Hapus akun '.$u['nama_lengkap'].'? Data bimbingan, revisi, notifikasi, dan file terkait akun ini juga akan dihapus. Tindakan ini tidak dapat dibatalkan.',JSON_UNESCAPED_UNICODE))?>);">
                   <input type="hidden" name="action" value="admin_delete_user">
                   <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
                   <input type="hidden" name="user_id" value="<?=e($u['id'])?>">

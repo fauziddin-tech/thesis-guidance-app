@@ -12,15 +12,78 @@ function require_login(): void { if (empty($_SESSION['user'])) redirect('?page=l
 function require_role(array $roles): void { require_login(); if (!in_array($_SESSION['user']['role']??'', $roles, true)) { http_response_code(403); exit('Akses ditolak.'); } }
 function flash(string $type,string $message): void { $_SESSION['flash']=['type'=>$type,'message'=>$message]; }
 function take_flash(): ?array { $f=$_SESSION['flash']??null; unset($_SESSION['flash']); return $f; }
+function impersonation_stop(mysqli $conn): bool {
+    $imp=$_SESSION['impersonator']??null;if(!$imp)return false;
+    $lid=(int)($imp['log_id']??0);
+    if($lid>0){$s=$conn->prepare('UPDATE impersonation_logs SET ended_at=NOW() WHERE id=? AND ended_at IS NULL');if($s){$s->bind_param('i',$lid);$s->execute();$s->close();}}
+    $oid=(int)($imp['id']??0);$orig=null;
+    $s=$conn->prepare('SELECT id,username,email,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE id=? LIMIT 1');
+    if($s){$s->bind_param('i',$oid);$s->execute();$orig=$s->get_result()->fetch_assoc();$s->close();}
+    unset($_SESSION['impersonator']);
+    if($orig){$_SESSION['user']=$orig;}else{unset($_SESSION['user']);}
+    session_regenerate_id(true);return true;
+}
 function notify_user(mysqli $conn,int $userId,string $type,string $message,?string $link=null): void { $s=$conn->prepare('INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,?,?,?)'); if($s){$s->bind_param('isss',$userId,$type,$message,$link);$s->execute();$s->close();} send_user_email($conn,$userId,'Notifikasi MyThesis','Aktivitas pada MyThesis',$message,$link,'Lihat Aktivitas'); }
 function chapter_number(string $name): int { return preg_match('/^Bab ([1-5])$/', $name, $m) ? (int)$m[1] : 0; }
 function latest_chapter(mysqli $conn,int $bid,string $name): ?array { $s=$conn->prepare('SELECT id,nama_bab,versi,status,file_path FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=? ORDER BY versi DESC,id DESC LIMIT 1'); $s->bind_param('is',$bid,$name); $s->execute(); $row=$s->get_result()->fetch_assoc(); $s->close(); return $row?:null; }
 
+if(($_SERVER['REQUEST_METHOD']??'')==='POST'&&empty($_POST)&&empty($_FILES)&&(int)($_SERVER['CONTENT_LENGTH']??0)>0){
+    error_log('[upload] POST melebihi post_max_size: content_length='.(int)$_SERVER['CONTENT_LENGTH'].' post_max_size='.ini_get('post_max_size'));
+    flash('danger','Ukuran unggahan ('.format_bytes((int)$_SERVER['CONTENT_LENGTH']).') melebihi batas server ('.ini_get('post_max_size').'). Kecilkan ukuran file atau hubungi administrator.');
+    redirect(!empty($_SESSION['user'])?'?page=dashboard':'?page=home');
+}
+
 $page=$_GET['page']??'home';
 $action=$_POST['action']??null;
 
+if(!empty($_SESSION['impersonator'])){
+    if(time()>(int)($_SESSION['impersonator']['expires']??0)){impersonation_stop($conn);flash('danger','Sesi login sebagai mahasiswa berakhir (maksimal 60 menit). Anda kembali ke akun sendiri.');redirect('?page=dashboard');}
+    if($page==='change-password'){flash('danger','Halaman ini tidak tersedia saat login sebagai mahasiswa.');redirect('?page=dashboard');}
+    if($action!==null&&!in_array($action,['impersonate_stop','logout'],true)){
+        if($action==='impersonate_start'){flash('danger','Kembali ke akun Anda terlebih dahulu sebelum membuka akun lain.');redirect('?page=dashboard');}
+        if(in_array($action,['update_profile','forgot_password','reset_password','login','register'],true)){flash('danger','Tindakan ini tidak tersedia saat login sebagai mahasiswa.');redirect('?page=dashboard');}
+        if(($_SESSION['impersonator']['mode']??'view')!=='act'){flash('danger','Mode "Lihat sebagai" hanya untuk melihat. Kembali ke akun Anda lalu pilih "Login penuh" jika perlu menguji unggah atau kirim data.');redirect('?page=dashboard');}
+    }
+}
+
+if($action==='impersonate_start'){
+    require_role(['admin','dosen']);verify_csrf();
+    $actor=$_SESSION['user'];$actorId=(int)$actor['id'];$targetId=(int)($_POST['user_id']??0);$mode=(($_POST['mode']??'view')==='act')?'act':'view';
+    $back=$actor['role']==='admin'?'?page=admin-dashboard#manajemen-akun':'?page=dashboard';
+    $s=$conn->prepare("SELECT id,username,email,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE id=? AND role='mahasiswa' LIMIT 1");$s->bind_param('i',$targetId);$s->execute();$target=$s->get_result()->fetch_assoc();$s->close();
+    if(!$target){flash('danger','Akun mahasiswa tidak ditemukan.');redirect($back);}
+    if($actor['role']==='dosen'){
+        $s=$conn->prepare('SELECT 1 FROM users u WHERE u.id=? AND (u.dosen_pembimbing_id=? OR EXISTS(SELECT 1 FROM bimbingan b WHERE b.mahasiswa_id=u.id AND b.dosen_id=?)) LIMIT 1');$s->bind_param('iii',$targetId,$actorId,$actorId);$s->execute();$allowed=$s->get_result()->num_rows>0;$s->close();
+        if(!$allowed){http_response_code(403);exit('Akses ditolak.');}
+    }
+    $logId=0;
+    try{
+        $s=$conn->prepare('INSERT INTO impersonation_logs(impersonator_id,impersonator_nama,impersonator_role,target_id,target_nama,mode,ip_address) VALUES(?,?,?,?,?,?,?)');
+        if(!$s)throw new Exception('prepare');
+        $an=(string)$actor['nama_lengkap'];$ar=(string)$actor['role'];$tn=(string)$target['nama_lengkap'];$ip=client_ip();
+        $s->bind_param('ississs',$actorId,$an,$ar,$targetId,$tn,$mode,$ip);
+        if(!$s->execute())throw new Exception('execute');
+        $logId=(int)$conn->insert_id;$s->close();
+    }catch(Throwable $e){$logId=0;}
+    if($logId<1){flash('danger','Login sebagai belum dapat dipakai karena tabel log belum tersedia. Jalankan migration_add_impersonation_logs.sql di database.');redirect($back);}
+    $msg=ucfirst($actor['role']).' '.$actor['nama_lengkap'].' membuka akun Anda ('.($mode==='act'?'login penuh':'hanya melihat').') untuk membantu menelusuri kendala.';
+    $s=$conn->prepare('INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,?,?,NULL)');if($s){$tipe='akses_akun';$s->bind_param('iss',$targetId,$tipe,$msg);$s->execute();$s->close();}
+    $_SESSION['impersonator']=['id'=>$actorId,'role'=>$actor['role'],'nama'=>$actor['nama_lengkap'],'mode'=>$mode,'log_id'=>$logId,'expires'=>time()+3600];
+    $_SESSION['user']=$target;session_regenerate_id(true);
+    redirect('?page=dashboard');
+}
+
+if($action==='impersonate_stop'){
+    require_login();verify_csrf();
+    $wasAdmin=(($_SESSION['impersonator']['role']??'')==='admin');
+    if(impersonation_stop($conn))flash('success','Anda kembali ke akun Anda.');
+    redirect($wasAdmin?'?page=admin-dashboard#manajemen-akun':'?page=dashboard');
+}
+
 if($action==='logout'){
-    verify_csrf(); $_SESSION=[];
+    verify_csrf();
+    if(!empty($_SESSION['impersonator']['log_id'])){$lid=(int)$_SESSION['impersonator']['log_id'];$s=$conn->prepare('UPDATE impersonation_logs SET ended_at=NOW() WHERE id=? AND ended_at IS NULL');if($s){$s->bind_param('i',$lid);$s->execute();$s->close();}}
+    $_SESSION=[];
     if(ini_get('session.use_cookies')){$p=session_get_cookie_params();setcookie(session_name(),' ',time()-42000,$p['path'],$p['domain'],$p['secure'],$p['httponly']);}
     session_destroy(); redirect('?page=home');
 }
@@ -130,9 +193,12 @@ if($action==='upload_bab'){
     if(!$owned||$n===0){flash('danger','Bimbingan atau bab tidak valid.');redirect('?page=dashboard');}
     if($n>1){$prev=latest_chapter($conn,$bid,'Bab '.($n-1));if(!$prev||$prev['status']!=='disetujui'){flash('danger','Bab sebelumnya harus mendapat ACC terlebih dahulu.');redirect('?page=dashboard');}}
     $latest=latest_chapter($conn,$bid,$name);if($latest&&in_array($latest['status'],['menunggu_review','disetujui'],true)){flash('danger','Bab ini masih menunggu review atau sudah ACC.');redirect('?page=dashboard');}
-    $versi=$latest?(int)$latest['versi']+1:1;$file=$_FILES['file']??null;if(!$file||$file['error']!==UPLOAD_ERR_OK||$file['size']>10*1024*1024){flash('danger','File wajib diunggah dan maksimal 10 MB.');redirect('?page=dashboard');}
-    $finfo=new finfo(FILEINFO_MIME_TYPE);$mime=$finfo->file($file['tmp_name']);$allowed=['application/pdf'=>'pdf','application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx'];if(!isset($allowed[$mime])){flash('danger','Format file harus PDF, DOC, atau DOCX.');redirect('?page=dashboard');}
-    $dir=__DIR__.'/uploads/bab';if(!is_dir($dir))mkdir($dir,0750,true);$stored='uploads/bab/'.bin2hex(random_bytes(16)).'.'.$allowed[$mime];$dest=__DIR__.'/'.$stored;if(!move_uploaded_file($file['tmp_name'],$dest)){flash('danger','File gagal disimpan.');redirect('?page=dashboard');}
+    $versi=$latest?(int)$latest['versi']+1:1;$file=$_FILES['file']??null;$upErr=$file?upload_error_message((int)$file['error'],'File'):'Pilih file skripsi terlebih dahulu.';
+    if($upErr!==null){error_log('[upload_bab] uid='.$uid.' kode='.($file['error']??'kosong'));flash('danger',$upErr);redirect('?page=dashboard');}
+    if($file['size']>10*1024*1024){flash('danger','Ukuran file '.format_bytes((int)$file['size']).' melebihi batas 10 MB.');redirect('?page=dashboard');}
+    $docType=detect_document_type($file['tmp_name'],(string)($file['name']??''));
+    if($docType===null){$fh=@fopen($file['tmp_name'],'rb');$hd=$fh?bin2hex((string)fread($fh,8)):'';if($fh)fclose($fh);error_log('[upload_bab] tipe tidak dikenali uid='.$uid.' ext='.strtolower(pathinfo((string)($file['name']??''),PATHINFO_EXTENSION)).' size='.(int)$file['size'].' head='.$hd);flash('danger','File tidak dikenali sebagai PDF, DOC, atau DOCX yang valid. Pastikan file tidak rusak, lalu simpan ulang sebagai PDF atau DOCX dan coba lagi.');redirect('?page=dashboard');}
+    $dir=__DIR__.'/uploads/bab';if(!is_dir($dir))mkdir($dir,0750,true);$stored='uploads/bab/'.bin2hex(random_bytes(16)).'.'.$docType;$dest=__DIR__.'/'.$stored;if(!move_uploaded_file($file['tmp_name'],$dest)){flash('danger','File gagal disimpan.');redirect('?page=dashboard');}
     $status='menunggu_review';$s=$conn->prepare('INSERT INTO bab_skripsi(bimbingan_id,nama_bab,file_path,versi,status) VALUES(?,?,?,?,?)');$s->bind_param('issis',$bid,$name,$stored,$versi,$status);$ok=$s->execute();$s->close();if(!$ok){@unlink($dest);flash('danger','Data bab gagal disimpan.');redirect('?page=dashboard');}
     $s=$conn->prepare('SELECT dosen_id FROM bimbingan WHERE id=?');$s->bind_param('i',$bid);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();if($r)notify_user($conn,(int)$r['dosen_id'],'bab_baru','Mahasiswa mengunggah '.$name.'.','?page=bimbingan-detail&id='.$bid);flash('success',$name.' berhasil diunggah dan menunggu review.');redirect('?page=dashboard');
 }
@@ -147,12 +213,13 @@ if($action==='add_revision'){
     if(!$r){flash('danger','Bab tidak dapat direvisi.');redirect('?page=dashboard');}
     $filePath=null;$file=$_FILES['file_revisi']??null;
     if($file && $file['error']!==UPLOAD_ERR_NO_FILE){
-        if($file['error']!==UPLOAD_ERR_OK||$file['size']>10*1024*1024){flash('danger','File revisi maksimal 10 MB.');redirect('?page=dashboard');}
-        $finfo=new finfo(FILEINFO_MIME_TYPE);$mime=$finfo->file($file['tmp_name']);
-        $allowed=['application/pdf'=>'pdf','application/msword'=>'doc','application/vnd.openxmlformats-officedocument.wordprocessingml.document'=>'docx'];
-        if(!isset($allowed[$mime])){flash('danger','Format file revisi harus PDF, DOC, atau DOCX.');redirect('?page=dashboard');}
+        $upErr=upload_error_message((int)$file['error'],'File revisi');
+        if($upErr!==null){error_log('[add_revision] uid='.$uid.' kode='.$file['error']);flash('danger',$upErr);redirect('?page=dashboard');}
+        if($file['size']>10*1024*1024){flash('danger','Ukuran file revisi '.format_bytes((int)$file['size']).' melebihi batas 10 MB.');redirect('?page=dashboard');}
+        $docType=detect_document_type($file['tmp_name'],(string)($file['name']??''));
+        if($docType===null){flash('danger','File revisi tidak dikenali sebagai PDF, DOC, atau DOCX yang valid.');redirect('?page=dashboard');}
         $dir=__DIR__.'/uploads/revisi';if(!is_dir($dir))mkdir($dir,0750,true);
-        $filePath='uploads/revisi/'.bin2hex(random_bytes(16)).'.'.$allowed[$mime];
+        $filePath='uploads/revisi/'.bin2hex(random_bytes(16)).'.'.$docType;
         if(!move_uploaded_file($file['tmp_name'],__DIR__.'/'.$filePath)){flash('danger','File revisi gagal disimpan.');redirect('?page=dashboard');}
     }
     $conn->begin_transaction();try{
@@ -335,6 +402,19 @@ $flash=take_flash();
         </nav>
     </div>
 </header>
+
+<?php if(!empty($_SESSION['impersonator'])): $imp=$_SESSION['impersonator']; $impMinutes=max(1,(int)ceil(((int)($imp['expires']??0)-time())/60)); ?>
+<div class="impersonation-banner" role="status">
+    <div class="container">
+        <span>Anda sedang login sebagai <strong><?=e($user['nama_lengkap']??'')?></strong> (mahasiswa) &middot; mode <strong><?=e(($imp['mode']??'view')==='act'?'login penuh':'lihat saja')?></strong> &middot; akun asli: <?=e($imp['nama']??'')?> &middot; berakhir dalam <?=e($impMinutes)?> menit. Semua akses tercatat.</span>
+        <form class="inline-form" method="post" action="?page=<?=e($page)?>">
+            <input type="hidden" name="action" value="impersonate_stop">
+            <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+            <button class="btn btn-secondary" type="submit">Kembali ke akun saya</button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
 
 <main class="container">
     <?php if($flash): ?>

@@ -132,7 +132,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 </section>
 
 <section class="card">
-  <h2>Unggah Bab</h2><p class="muted">Format PDF, DOC, atau DOCX. Maksimal 10 MB. Bab berikutnya hanya dapat diunggah setelah bab sebelumnya mendapat ACC.</p>
+  <h2>Unggah Bab</h2><p class="muted">Format PDF, DOC, atau DOCX. Maksimal <?=e(format_bytes(effective_upload_limit()))?>. Bab berikutnya hanya dapat diunggah setelah bab sebelumnya mendapat ACC.</p>
   <form method="post" enctype="multipart/form-data">
     <input type="hidden" name="action" value="upload_bab"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
     <div class="form-group"><label>Bimbingan</label><select name="bimbingan_id" required><option value="">Pilih bimbingan</option><?php $s=$conn->prepare("SELECT id,judul_skripsi FROM bimbingan WHERE mahasiswa_id=? AND status='aktif' ORDER BY created_at DESC");$s->bind_param('i',$uid);$s->execute();$r=$s->get_result();while($b=$r->fetch_assoc()): ?><option value="<?=$b['id']?>"><?=e($b['judul_skripsi'])?></option><?php endwhile;$s->close(); ?></select></div>
@@ -156,7 +156,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
     <p class="muted">Daftar mahasiswa yang menjadi bimbingan Anda. Pilih <strong>Detail Bimbingan</strong> untuk melihat alur, dokumen, riwayat review, dan proses ACC.</p>
   </div>
   <?php
-  $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.status,b.updated_at,u.nama_lengkap mahasiswa_nama,u.email
+  $s=$conn->prepare("SELECT b.id,b.mahasiswa_id,b.judul_skripsi,b.status,b.updated_at,u.nama_lengkap mahasiswa_nama,u.email
                      FROM bimbingan b
                      JOIN users u ON u.id=b.mahasiswa_id
                      WHERE b.dosen_id=?
@@ -182,6 +182,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
             <div><?=getStatusBadge($b['status'])?></div>
             <small class="muted">Diperbarui <?=e(formatDateTime($b['updated_at']))?></small>
             <a class="btn btn-primary" href="?page=bimbingan-detail&id=<?=e($b['id'])?>">Detail Bimbingan</a>
+            <?=impersonate_form((int)$b['mahasiswa_id'],(string)$b['mahasiswa_nama'])?>
           </div>
         </article>
       <?php endwhile; ?>
@@ -235,7 +236,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
     <p class="muted">Riwayat permintaan revisi judul mahasiswa bimbingan, termasuk judul sebelum, catatan, pengajuan ulang, dan persetujuan.</p>
   </div>
   <?php
-  $s=$conn->prepare("SELECT jr.*,u.nama_lengkap mahasiswa_nama FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id WHERE jr.dosen_id=? ORDER BY jr.id DESC");
+  $s=$conn->prepare("SELECT jr.*,u.nama_lengkap mahasiswa_nama,b.status AS bimbingan_status,(SELECT MAX(x.id) FROM judul_revisi x WHERE x.bimbingan_id=jr.bimbingan_id) AS latest_revisi_id FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id JOIN bimbingan b ON b.id=jr.bimbingan_id WHERE jr.dosen_id=? ORDER BY jr.id DESC");
   if($s){$s->bind_param('i',$uid);$s->execute();$titleHistoryRows=$s->get_result();$s->close();}else{$titleHistoryRows=false;}
   ?>
   <?php if($titleHistoryRows===false): ?>
@@ -249,7 +250,11 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
         <td><strong><?=e($h['mahasiswa_nama'])?></strong></td>
         <td><?=e($h['judul_sebelum'])?></td>
         <td><?=e($h['catatan_dosen'])?></td>
-        <td><?=getStatusBadge($h['status'])?></td>
+        <td><?php
+          $rowBadge=$h['status'];
+          if($rowBadge==='diajukan_ulang'){$rowBadge=((int)$h['id']===(int)$h['latest_revisi_id']&&$h['bimbingan_status']==='pengajuan_judul')?'menunggu_review':'sudah_ditinjau';}
+          echo getStatusBadge($rowBadge);
+        ?></td>
         <td><?=e(formatDateTime($h['requested_at']))?></td>
         <td><a class="btn btn-secondary" href="?page=bimbingan-detail&id=<?=e($h['bimbingan_id'])?>">Buka Detail</a></td>
       </tr>
