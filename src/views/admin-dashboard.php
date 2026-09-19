@@ -37,6 +37,15 @@ $dosen=[];
 $r=$conn->query("SELECT id,nama_lengkap,email FROM users WHERE role='dosen' ORDER BY nama_lengkap ASC");
 if($r) $dosen=$r->fetch_all(MYSQLI_ASSOC);
 
+$dosenRows=[];
+$r=$conn->query("SELECT u.id,u.nama_lengkap,u.username,u.email,u.no_telp,
+                        (SELECT COUNT(*) FROM bimbingan b WHERE b.dosen_id=u.id) AS total_bimbingan
+                 FROM users u WHERE u.role='dosen' ORDER BY u.nama_lengkap ASC");
+if($r) $dosenRows=$r->fetch_all(MYSQLI_ASSOC);
+
+$old=$_SESSION['old_dosen_form']??[];
+unset($_SESSION['old_dosen_form']);
+
 $bimbingan=[];
 $r=$conn->query("SELECT b.id,b.judul_skripsi,b.status,b.updated_at,b.dosen_id,
                         m.nama_lengkap mahasiswa_nama,
@@ -129,6 +138,56 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
         </table>
       </div>
     <?php endif; ?>
+  </section>
+</div>
+
+<div class="admin-layout" id="tambah-dosen">
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>Daftar Dosen</h2>
+        <p class="muted">Akun dosen yang dapat dipilih sebagai pembimbing.</p>
+      </div>
+    </div>
+    <?php if(!$dosenRows): ?>
+      <div class="empty-state">Belum ada akun dosen. Tambahkan lewat formulir di samping.</div>
+    <?php else: ?>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nama</th><th>Username</th><th>Kontak</th><th>Bimbingan</th></tr></thead>
+          <tbody>
+          <?php foreach($dosenRows as $dl): ?>
+            <tr>
+              <td><strong><?=e($dl['nama_lengkap'])?></strong></td>
+              <td><?=e($dl['username'])?></td>
+              <td><?=e($dl['email'])?><?php if(!empty($dl['no_telp'])): ?><br><small class="muted"><?=e($dl['no_telp'])?></small><?php endif; ?></td>
+              <td><?=e((int)$dl['total_bimbingan'])?></td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+  </section>
+
+  <section class="card">
+    <div class="section-heading">
+      <div>
+        <h2>Tambah Akun Dosen</h2>
+        <p class="muted">Buat akun dosen baru. Password awal sampaikan langsung kepada dosen.</p>
+      </div>
+    </div>
+    <form method="post" action="?page=admin-dashboard#tambah-dosen" autocomplete="off">
+      <input type="hidden" name="action" value="admin_create_dosen">
+      <input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>">
+      <div class="form-group"><label for="dosen_nama">Nama Lengkap</label><input id="dosen_nama" name="nama_lengkap" required maxlength="150" value="<?=e($old['nama_lengkap']??'')?>"></div>
+      <div class="form-group"><label for="dosen_username">Username</label><input id="dosen_username" name="username" required minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]{3,50}" title="Huruf, angka, titik, garis bawah, atau strip (3–50 karakter)" value="<?=e($old['username']??'')?>"></div>
+      <div class="form-group"><label for="dosen_email">Email</label><input id="dosen_email" name="email" type="email" required maxlength="100" value="<?=e($old['email']??'')?>"></div>
+      <div class="form-group"><label for="dosen_telp">No. Telepon (opsional)</label><input id="dosen_telp" name="no_telp" maxlength="15" value="<?=e($old['no_telp']??'')?>"></div>
+      <div class="form-group"><label for="dosen_password">Password Awal</label><input id="dosen_password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required></div>
+      <div class="form-group"><label for="dosen_confirm">Konfirmasi Password</label><input id="dosen_confirm" name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required></div>
+      <button class="btn btn-success" type="submit">Buat Akun Dosen</button>
+    </form>
   </section>
 </div>
 
