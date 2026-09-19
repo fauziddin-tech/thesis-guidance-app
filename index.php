@@ -212,7 +212,12 @@ if($action==='admin_delete_user'){
     if(!$account){flash('danger','Akun tidak ditemukan.');redirect('?page=admin-dashboard');}
     $files=[];
     if(!empty($account['profile_photo']))$files[]=$account['profile_photo'];
-    foreach(['uploads/bab','uploads/revisi','uploads/konsultasi'] as $dir){$s=$conn->prepare("SELECT file_path FROM ".($dir==='uploads/bab'?'bab_skripsi':($dir==='uploads/revisi'?'revisi':'konsultasi'))." WHERE ".($dir==='uploads/bab'?'bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)':($dir==='uploads/revisi'?'bab_id IN (SELECT bs.id FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id WHERE b.mahasiswa_id=? OR b.dosen_id=?)':'bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)')));$s->bind_param('ii',$target,$target);$s->execute();$rs=$s->get_result();while($row=$rs->fetch_assoc()){if(!empty($row['file_path']))$files[]=$row['file_path'];}$s->close();}
+    $s=$conn->prepare('SELECT file_path FROM bab_skripsi WHERE bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)');
+    $s->bind_param('ii',$target,$target);$s->execute();$rs=$s->get_result();while($row=$rs->fetch_assoc()){if(!empty($row['file_path']))$files[]=$row['file_path'];}$s->close();
+    $s=$conn->prepare('SELECT r.file_path FROM revisi r JOIN bab_skripsi bs ON bs.id=r.bab_id JOIN bimbingan b ON b.id=bs.bimbingan_id WHERE b.mahasiswa_id=? OR b.dosen_id=?');
+    $s->bind_param('ii',$target,$target);$s->execute();$rs=$s->get_result();while($row=$rs->fetch_assoc()){if(!empty($row['file_path']))$files[]=$row['file_path'];}$s->close();
+    $s=$conn->prepare('SELECT file_lampiran FROM konsultasi WHERE bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)');
+    $s->bind_param('ii',$target,$target);$s->execute();$rs=$s->get_result();while($row=$rs->fetch_assoc()){if(!empty($row['file_lampiran']))$files[]=$row['file_lampiran'];}$s->close();
     $conn->begin_transaction();try{$s=$conn->prepare('DELETE FROM users WHERE id=?');$s->bind_param('i',$target);if(!$s->execute())throw new Exception();if($s->affected_rows!==1)throw new Exception();$s->close();$conn->commit();
         $base=realpath(__DIR__.'/uploads');if($base){foreach(array_unique($files) as $path){if(strpos($path,'uploads/')!==0)continue;$real=realpath(__DIR__.'/'.$path);if($real&&strpos($real,$base.DIRECTORY_SEPARATOR)===0)@unlink($real);}}
         flash('success','Akun '.$account['nama_lengkap'].' berhasil dihapus.');
