@@ -43,9 +43,22 @@ $r=$conn->query("SELECT u.id,u.nama_lengkap,u.username,u.email,u.no_telp,
                  FROM users u WHERE u.role='dosen' ORDER BY u.nama_lengkap ASC");
 if($r) $dosenRows=$r->fetch_all(MYSQLI_ASSOC);
 
-$accountRows=[];
-$r=$conn->query("SELECT id,username,email,role,nama_lengkap,created_at FROM users ORDER BY created_at DESC,id DESC");
-if($r) $accountRows=$r->fetch_all(MYSQLI_ASSOC);
+$accountSearch=trim($_GET['account_q']??'');
+$accountLimit=(int)($_GET['account_limit']??10);
+if(!in_array($accountLimit,[10,20,50],true)) $accountLimit=10;
+$accountPage=max(1,(int)($_GET['account_page']??1));
+$accountOffset=($accountPage-1)*$accountLimit;
+$accountRows=[];$accountTotal=0;$accountTotalPages=1;
+if($accountSearch!==''){
+    $like='%'.$accountSearch.'%';
+    $s=$conn->prepare('SELECT COUNT(*) total FROM users WHERE nama_lengkap LIKE ?');$s->bind_param('s',$like);$s->execute();$accountTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare('SELECT id,username,email,role,nama_lengkap,created_at FROM users WHERE nama_lengkap LIKE ? ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?');$s->bind_param('sii',$like,$accountLimit,$accountOffset);$s->execute();$accountRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+}else{
+    $r=$conn->query('SELECT COUNT(*) total FROM users');if($r)$accountTotal=(int)($r->fetch_assoc()['total']??0);
+    $s=$conn->prepare('SELECT id,username,email,role,nama_lengkap,created_at FROM users ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?');$s->bind_param('ii',$accountLimit,$accountOffset);$s->execute();$accountRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+}
+$accountTotalPages=max(1,(int)ceil($accountTotal/$accountLimit));
+if($accountPage>$accountTotalPages){$accountPage=$accountTotalPages;$accountOffset=($accountPage-1)*$accountLimit;}
 
 $old=$_SESSION['old_dosen_form']??[];
 unset($_SESSION['old_dosen_form']);
@@ -80,6 +93,7 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
 .admin-progress{min-width:90px}
 .admin-progress-track{height:7px;background:#e9edf0;border-radius:5px;overflow:hidden;margin-top:7px}
 .admin-progress-bar{height:100%;background:#315d82}
+.account-toolbar{display:flex;justify-content:space-between;gap:16px;align-items:end;margin:16px 0}.account-toolbar label{font-weight:600;font-size:14px}.account-search-row{display:flex;gap:8px;align-items:center}.account-search-row input{min-width:300px}.account-pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #e6ebef}.account-pagination-info{color:#687684;font-size:13px}.account-pagination-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.account-pagination-controls select{min-width:72px}@media(max-width:700px){.account-toolbar{display:block}.account-search-row{margin-top:8px}.account-search-row input{min-width:0;flex:1}.account-pagination{display:block}.account-pagination-controls{margin-top:10px}}
 @media(max-width:1050px){.admin-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-layout{grid-template-columns:1fr}.admin-table-actions{min-width:190px}}
 @media(max-width:640px){.admin-summary{grid-template-columns:1fr}.admin-table-actions form{align-items:stretch;flex-direction:column}.admin-table-actions select,.admin-table-actions .btn{width:100%}}
 </style>
@@ -205,6 +219,16 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
       <p class="muted">Hapus akun mahasiswa atau dosen beserta data bimbingan dan file terkait.</p>
     </div>
   </div>
+  <form method="get" class="account-toolbar">
+    <input type="hidden" name="page" value="admin-dashboard">
+    <input type="hidden" name="account_limit" value="<?=e($accountLimit)?>">
+    <label for="account_q">Cari berdasarkan nama</label>
+    <div class="account-search-row">
+      <input id="account_q" name="account_q" type="search" value="<?=e($accountSearch)?>" placeholder="Masukkan nama lengkap">
+      <button class="btn btn-secondary" type="submit">Cari</button>
+      <?php if($accountSearch!==''): ?><a class="btn btn-secondary" href="?page=admin-dashboard#manajemen-akun">Reset</a><?php endif; ?>
+    </div>
+  </form>
   <?php if(!$accountRows): ?>
     <div class="empty-state">Belum ada akun pengguna.</div>
   <?php else: ?>
@@ -234,6 +258,21 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
         <?php endforeach; ?>
         </tbody>
       </table>
+    </div>
+    <div class="account-pagination">
+      <div class="account-pagination-info">Menampilkan <?=e($accountTotal ? $accountOffset+1 : 0)?>–<?=e(min($accountOffset+$accountLimit,$accountTotal))?> dari <?=e($accountTotal)?> akun</div>
+      <div class="account-pagination-controls">
+        <label for="account_limit_bottom">Tampilkan</label>
+        <select id="account_limit_bottom" onchange="window.location.href='?page=admin-dashboard&amp;account_q='+encodeURIComponent(<?=json_encode($accountSearch)?>)+'&amp;account_limit='+this.value+'&amp;account_page=1#manajemen-akun'">
+          <option value="10" <?=$accountLimit===10?'selected':''?>>10</option>
+          <option value="20" <?=$accountLimit===20?'selected':''?>>20</option>
+          <option value="50" <?=$accountLimit===50?'selected':''?>>50</option>
+        </select>
+        <span>per halaman</span>
+        <?php if($accountPage>1): ?><a class="btn btn-secondary" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$accountPage-1?>#manajemen-akun">Sebelumnya</a><?php endif; ?>
+        <span>Halaman <?=e($accountPage)?> / <?=e($accountTotalPages)?></span>
+        <?php if($accountPage<$accountTotalPages): ?><a class="btn btn-secondary" href="?page=admin-dashboard&amp;account_q=<?=urlencode($accountSearch)?>&amp;account_limit=<?=$accountLimit?>&amp;account_page=<?=$accountPage+1?>#manajemen-akun">Berikutnya</a><?php endif; ?>
+      </div>
     </div>
   <?php endif; ?>
 </section>
