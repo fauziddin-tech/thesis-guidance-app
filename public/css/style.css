@@ -10,3 +10,10 @@
 .profile-photo-wrap{width:84px;height:84px;flex:0 0 84px}
 .profile-photo{width:84px;height:84px;border-radius:50%;object-fit:cover;border:1px solid #d4dde5;background:#f1f4f6}
 .profile-photo-placeholder{display:flex;align-items:center;justify-content:center;color:#71808e;font-size:12px;font-weight:700}
+
+.dashboard-refresh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.dashboard-refresh-status{font-size:12px;color:#687786;white-space:nowrap}
+.dashboard-refresh-status strong{color:#315d82;font-weight:800}
+.dashboard-refresh .btn{white-space:nowrap}
+.dashboard-refresh .btn:disabled{opacity:.65;cursor:wait}
+@media(max-width:900px){.dashboard-refresh{justify-content:flex-start}}
