@@ -198,7 +198,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
             <?=impersonate_form((int)$b['mahasiswa_id'],(string)$b['mahasiswa_nama'])?>
           </div>
         </article>
-      <?php endwhile; ?>
+      <?php endforeach; ?>
     </div>
     <?=render_pagination($studentPage,$studentTotalPages,$studentTotal,$studentOffset,$studentLimit,['page'=>'dashboard','student_q'=>$studentSearch,'student_limit'=>$studentLimit],'student_page','#mahasiswa-bimbingan','mahasiswa')?>
   <?php endif; ?>
@@ -280,9 +280,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
   }
   $historyTotalPages=max(1,(int)ceil($historyTotal/$historyLimit)); if($historyPage>$historyTotalPages){$historyPage=$historyTotalPages;$historyOffset=($historyPage-1)*$historyLimit;}
   ?>
-  <?php if($titleHistoryRows===false): ?>
-    <div class="empty-state">Riwayat belum dapat ditampilkan. Pastikan migration <strong>migration_add_judul_revisi_history.sql</strong> sudah dijalankan di database.</div>
-  <?php elseif(!$titleHistoryRows->num_rows): ?>
+  <?php if(!$titleHistoryRows): ?>
     <div class="empty-state">Belum ada permintaan revisi judul.</div>
   <?php else: ?>
     <form method="get" class="account-toolbar">
