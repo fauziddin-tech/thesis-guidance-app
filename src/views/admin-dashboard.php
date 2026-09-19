@@ -86,6 +86,10 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
     <p class="muted">Pusat pemantauan pengguna, bimbingan, pengajuan judul, dan progres Bab 1–5.</p>
   </div>
   <span class="role-badge">Administrator</span>
+  <div class="dashboard-refresh" data-dashboard-refresh>
+    <button class="btn btn-secondary" type="button" data-refresh-now>Muat Ulang</button>
+    <span class="dashboard-refresh-status" data-refresh-status>Memuat ulang otomatis dalam <strong data-refresh-countdown>20</strong> detik.</span>
+  </div>
 </div>
 
 <section class="admin-summary">
@@ -267,3 +271,34 @@ if($r) $bimbingan=$r->fetch_all(MYSQLI_ASSOC);
   <h2>Ruang Lingkup Admin</h2>
   <p class="muted">Admin menangani administrasi pengguna dan bimbingan. Persetujuan judul serta review dan ACC Bab 1–5 tetap mengikuti dosen pembimbing. Perubahan dosen atau status administratif dari panel ini mengirim notifikasi kepada mahasiswa terkait.</p>
 </section>
+
+<script>
+(function(){
+  const root=document.querySelector('[data-dashboard-refresh]');
+  if(!root) return;
+  const countdown=root.querySelector('[data-refresh-countdown]');
+  const status=root.querySelector('[data-refresh-status]');
+  const button=root.querySelector('[data-refresh-now]');
+  const intervalSeconds=20;
+  let remaining=intervalSeconds;
+  let timer=null;
+  function update(){
+    if(countdown) countdown.textContent=remaining;
+  }
+  function refreshNow(){
+    if(button){button.disabled=true;button.textContent='Memuat Ulang...';}
+    if(status) status.textContent='Memuat ulang halaman...';
+    window.location.reload();
+  }
+  if(button) button.addEventListener('click',refreshNow);
+  update();
+  timer=setInterval(function(){
+    remaining--;
+    update();
+    if(remaining<=0){
+      clearInterval(timer);
+      refreshNow();
+    }
+  },1000);
+})();
+</script>
