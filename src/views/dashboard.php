@@ -150,24 +150,37 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
 
 <?php elseif($role==='dosen'): ?>
 
-<section class="card">
+<section class="card" id="mahasiswa-bimbingan">
   <div class="section-heading">
     <h2>Mahasiswa Bimbingan</h2>
     <p class="muted">Daftar mahasiswa yang menjadi bimbingan Anda. Pilih <strong>Detail Bimbingan</strong> untuk melihat alur, dokumen, riwayat review, dan proses ACC.</p>
   </div>
   <?php
-  $s=$conn->prepare("SELECT b.id,b.mahasiswa_id,b.judul_skripsi,b.status,b.updated_at,u.nama_lengkap mahasiswa_nama,u.email
-                     FROM bimbingan b
-                     JOIN users u ON u.id=b.mahasiswa_id
-                     WHERE b.dosen_id=?
-                     ORDER BY u.nama_lengkap ASC, b.updated_at DESC");
-  $s->bind_param('i',$uid);$s->execute();$r=$s->get_result();
-  if(!$r->num_rows):
+  $studentSearch=trim($_GET['student_q']??''); $studentLimit=(int)($_GET['student_limit']??10); if(!in_array($studentLimit,[10,20,50],true)) $studentLimit=10;
+  $studentPage=max(1,(int)($_GET['student_page']??1)); $studentOffset=($studentPage-1)*$studentLimit; $studentTotal=0;$studentRows=[];
+  if($studentSearch!==''){
+    $like='%'.$studentSearch.'%';
+    $s=$conn->prepare("SELECT COUNT(*) total FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND (u.nama_lengkap LIKE ? OR u.email LIKE ? OR b.judul_skripsi LIKE ?)");
+    $s->bind_param('isss',$uid,$like,$like,$like);$s->execute();$studentTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT b.id,b.mahasiswa_id,b.judul_skripsi,b.status,b.updated_at,u.nama_lengkap mahasiswa_nama,u.email FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND (u.nama_lengkap LIKE ? OR u.email LIKE ? OR b.judul_skripsi LIKE ?) ORDER BY u.nama_lengkap ASC,b.updated_at DESC,b.id DESC LIMIT ? OFFSET ?");
+    $s->bind_param('isssii',$uid,$like,$like,$like,$studentLimit,$studentOffset);$s->execute();$studentRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+  }else{
+    $s=$conn->prepare("SELECT COUNT(*) total FROM bimbingan WHERE dosen_id=?");$s->bind_param('i',$uid);$s->execute();$studentTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT b.id,b.mahasiswa_id,b.judul_skripsi,b.status,b.updated_at,u.nama_lengkap mahasiswa_nama,u.email FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? ORDER BY u.nama_lengkap ASC,b.updated_at DESC,b.id DESC LIMIT ? OFFSET ?");
+    $s->bind_param('iii',$uid,$studentLimit,$studentOffset);$s->execute();$studentRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+  }
+  $studentTotalPages=max(1,(int)ceil($studentTotal/$studentLimit)); if($studentPage>$studentTotalPages){$studentPage=$studentTotalPages;$studentOffset=($studentPage-1)*$studentLimit;}
+  if(!$studentRows):
   ?>
     <div class="empty-state">Belum ada mahasiswa bimbingan.</div>
   <?php else: ?>
+    <form method="get" class="account-toolbar">
+      <input type="hidden" name="page" value="dashboard"><input type="hidden" name="student_page" value="1">
+      <div class="account-search"><div><label for="student_q">Cari mahasiswa</label><div class="account-search-row"><input id="student_q" name="student_q" type="search" value="<?=e($studentSearch)?>" placeholder="Nama, email, atau judul skripsi"><button class="btn btn-secondary" type="submit">Cari</button><?php if($studentSearch!==''): ?><a class="btn btn-secondary" href="?page=dashboard#mahasiswa-bimbingan">Reset</a><?php endif; ?></div></div></div>
+      <div class="account-limit"><label for="student_limit_top">Tampilkan</label><select id="student_limit_top" name="student_limit" onchange="this.form.submit()"><option value="10" <?=$studentLimit===10?'selected':''?>>10</option><option value="20" <?=$studentLimit===20?'selected':''?>>20</option><option value="50" <?=$studentLimit===50?'selected':''?>>50</option></select></div>
+    </form>
     <div class="student-list">
-      <?php while($b=$r->fetch_assoc()): ?>
+      <?php foreach($studentRows as $b): ?>
         <article class="student-card">
           <div class="student-card-main">
             <div class="student-index">MAHASISWA</div>
@@ -187,26 +200,41 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
         </article>
       <?php endwhile; ?>
     </div>
-  <?php endif; $s->close(); ?>
+    <?=render_pagination($studentPage,$studentTotalPages,$studentTotal,$studentOffset,$studentLimit,['page'=>'dashboard','student_q'=>$studentSearch,'student_limit'=>$studentLimit],'student_page','#mahasiswa-bimbingan','mahasiswa')?>
+  <?php endif; ?>
 </section>
 
-<section class="card">
+<section class="card" id="pengajuan-judul">
   <div class="section-heading">
     <h2>Pengajuan Judul</h2>
     <p class="muted">Pengajuan judul yang menunggu keputusan dosen.</p>
   </div>
   <?php
-  $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.deskripsi,u.nama_lengkap mahasiswa_nama
-                     FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id
-                     WHERE b.dosen_id=? AND b.status='pengajuan_judul'
-                     ORDER BY b.created_at ASC");
-  $s->bind_param('i',$uid);$s->execute();$judulRows=$s->get_result();
-  if(!$judulRows->num_rows):
+  $judulSearch=trim($_GET['judul_q']??''); $judulLimit=(int)($_GET['judul_limit']??10); if(!in_array($judulLimit,[10,20,50],true)) $judulLimit=10;
+  $judulPage=max(1,(int)($_GET['judul_page']??1)); $judulOffset=($judulPage-1)*$judulLimit; $judulTotal=0;$judulRows=[];
+  if($judulSearch!==''){
+    $like='%'.$judulSearch.'%';
+    $s=$conn->prepare("SELECT COUNT(*) total FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='pengajuan_judul' AND (u.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ? OR b.deskripsi LIKE ?)");
+    $s->bind_param('isss',$uid,$like,$like,$like);$s->execute();$judulTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.deskripsi,u.nama_lengkap mahasiswa_nama FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='pengajuan_judul' AND (u.nama_lengkap LIKE ? OR b.judul_skripsi LIKE ? OR b.deskripsi LIKE ?) ORDER BY b.created_at ASC,b.id ASC LIMIT ? OFFSET ?");
+    $s->bind_param('isssii',$uid,$like,$like,$like,$judulLimit,$judulOffset);$s->execute();$judulRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+  }else{
+    $s=$conn->prepare("SELECT COUNT(*) total FROM bimbingan WHERE dosen_id=? AND status='pengajuan_judul'");$s->bind_param('i',$uid);$s->execute();$judulTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT b.id,b.judul_skripsi,b.deskripsi,u.nama_lengkap mahasiswa_nama FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.dosen_id=? AND b.status='pengajuan_judul' ORDER BY b.created_at ASC,b.id ASC LIMIT ? OFFSET ?");
+    $s->bind_param('iii',$uid,$judulLimit,$judulOffset);$s->execute();$judulRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+  }
+  $judulTotalPages=max(1,(int)ceil($judulTotal/$judulLimit)); if($judulPage>$judulTotalPages){$judulPage=$judulTotalPages;$judulOffset=($judulPage-1)*$judulLimit;}
+  if(!$judulRows):
   ?>
     <div class="empty-state">Belum ada pengajuan judul yang menunggu keputusan.</div>
   <?php else: ?>
+    <form method="get" class="account-toolbar">
+      <input type="hidden" name="page" value="dashboard"><input type="hidden" name="judul_page" value="1">
+      <div class="account-search"><div><label for="judul_q">Cari pengajuan</label><div class="account-search-row"><input id="judul_q" name="judul_q" type="search" value="<?=e($judulSearch)?>" placeholder="Nama mahasiswa, judul, atau deskripsi"><button class="btn btn-secondary" type="submit">Cari</button><?php if($judulSearch!==''): ?><a class="btn btn-secondary" href="?page=dashboard#pengajuan-judul">Reset</a><?php endif; ?></div></div></div>
+      <div class="account-limit"><label for="judul_limit_top">Tampilkan</label><select id="judul_limit_top" name="judul_limit" onchange="this.form.submit()"><option value="10" <?=$judulLimit===10?'selected':''?>>10</option><option value="20" <?=$judulLimit===20?'selected':''?>>20</option><option value="50" <?=$judulLimit===50?'selected':''?>>50</option></select></div>
+    </form>
     <div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul</th><th>Deskripsi</th><th>Aksi</th></tr></thead><tbody>
-    <?php while($j=$judulRows->fetch_assoc()): ?>
+    <?php foreach($judulRows as $j): ?>
       <tr>
         <td><strong><?=e($j['mahasiswa_nama'])?></strong></td>
         <td><?=e($j['judul_skripsi'])?></td>
@@ -228,24 +256,42 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
       </tr>
     <?php endwhile; ?>
     </tbody></table></div>
-  <?php endif; $s->close(); ?>
+    <?=render_pagination($judulPage,$judulTotalPages,$judulTotal,$judulOffset,$judulLimit,['page'=>'dashboard','judul_q'=>$judulSearch,'judul_limit'=>$judulLimit],'judul_page','#pengajuan-judul','pengajuan judul')?>
+  <?php endif; ?>
 </section>
-<section class="card">
+<section class="card" id="riwayat-revisi-judul">
   <div class="section-heading">
     <h2>Riwayat Revisi Judul</h2>
     <p class="muted">Riwayat permintaan revisi judul mahasiswa bimbingan, termasuk judul sebelum, catatan, pengajuan ulang, dan persetujuan.</p>
   </div>
   <?php
-  $s=$conn->prepare("SELECT jr.*,u.nama_lengkap mahasiswa_nama,b.status AS bimbingan_status,(SELECT MAX(x.id) FROM judul_revisi x WHERE x.bimbingan_id=jr.bimbingan_id) AS latest_revisi_id FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id JOIN bimbingan b ON b.id=jr.bimbingan_id WHERE jr.dosen_id=? ORDER BY jr.id DESC");
-  if($s){$s->bind_param('i',$uid);$s->execute();$titleHistoryRows=$s->get_result();$s->close();}else{$titleHistoryRows=false;}
+  $historySearch=trim($_GET['history_q']??''); $historyLimit=(int)($_GET['history_limit']??10); if(!in_array($historyLimit,[10,20,50],true)) $historyLimit=10;
+  $historyPage=max(1,(int)($_GET['history_page']??1)); $historyOffset=($historyPage-1)*$historyLimit; $historyTotal=0;$titleHistoryRows=[];
+  $like=$historySearch!==''?'%'.$historySearch.'%':null;
+  if($like!==null){
+    $s=$conn->prepare("SELECT COUNT(*) total FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id WHERE jr.dosen_id=? AND (u.nama_lengkap LIKE ? OR jr.judul_sebelum LIKE ? OR jr.catatan_dosen LIKE ?)");
+    $s->bind_param('isss',$uid,$like,$like,$like);$s->execute();$historyTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT jr.*,u.nama_lengkap mahasiswa_nama,b.status AS bimbingan_status,(SELECT MAX(x.id) FROM judul_revisi x WHERE x.bimbingan_id=jr.bimbingan_id) AS latest_revisi_id FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id JOIN bimbingan b ON b.id=jr.bimbingan_id WHERE jr.dosen_id=? AND (u.nama_lengkap LIKE ? OR jr.judul_sebelum LIKE ? OR jr.catatan_dosen LIKE ?) ORDER BY jr.id DESC LIMIT ? OFFSET ?");
+    $s->bind_param('isssii',$uid,$like,$like,$like,$historyLimit,$historyOffset);$s->execute();$titleHistoryRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+  }else{
+    $s=$conn->prepare("SELECT COUNT(*) total FROM judul_revisi jr WHERE jr.dosen_id=?");$s->bind_param('i',$uid);$s->execute();$historyTotal=(int)($s->get_result()->fetch_assoc()['total']??0);$s->close();
+    $s=$conn->prepare("SELECT jr.*,u.nama_lengkap mahasiswa_nama,b.status AS bimbingan_status,(SELECT MAX(x.id) FROM judul_revisi x WHERE x.bimbingan_id=jr.bimbingan_id) AS latest_revisi_id FROM judul_revisi jr JOIN users u ON u.id=jr.mahasiswa_id JOIN bimbingan b ON b.id=jr.bimbingan_id WHERE jr.dosen_id=? ORDER BY jr.id DESC LIMIT ? OFFSET ?");
+    $s->bind_param('iii',$uid,$historyLimit,$historyOffset);$s->execute();$titleHistoryRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+  }
+  $historyTotalPages=max(1,(int)ceil($historyTotal/$historyLimit)); if($historyPage>$historyTotalPages){$historyPage=$historyTotalPages;$historyOffset=($historyPage-1)*$historyLimit;}
   ?>
   <?php if($titleHistoryRows===false): ?>
     <div class="empty-state">Riwayat belum dapat ditampilkan. Pastikan migration <strong>migration_add_judul_revisi_history.sql</strong> sudah dijalankan di database.</div>
   <?php elseif(!$titleHistoryRows->num_rows): ?>
     <div class="empty-state">Belum ada permintaan revisi judul.</div>
   <?php else: ?>
+    <form method="get" class="account-toolbar">
+      <input type="hidden" name="page" value="dashboard"><input type="hidden" name="history_page" value="1">
+      <div class="account-search"><div><label for="history_q">Cari riwayat revisi</label><div class="account-search-row"><input id="history_q" name="history_q" type="search" value="<?=e($historySearch)?>" placeholder="Nama mahasiswa, judul, atau catatan"><button class="btn btn-secondary" type="submit">Cari</button><?php if($historySearch!==''): ?><a class="btn btn-secondary" href="?page=dashboard#riwayat-revisi-judul">Reset</a><?php endif; ?></div></div></div>
+      <div class="account-limit"><label for="history_limit_top">Tampilkan</label><select id="history_limit_top" name="history_limit" onchange="this.form.submit()"><option value="10" <?=$historyLimit===10?'selected':''?>>10</option><option value="20" <?=$historyLimit===20?'selected':''?>>20</option><option value="50" <?=$historyLimit===50?'selected':''?>>50</option></select></div>
+    </form>
     <div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul Sebelum</th><th>Catatan Dosen</th><th>Status</th><th>Waktu</th><th>Detail</th></tr></thead><tbody>
-    <?php while($h=$titleHistoryRows->fetch_assoc()): ?>
+    <?php foreach($titleHistoryRows as $h): ?>
       <tr>
         <td><strong><?=e($h['mahasiswa_nama'])?></strong></td>
         <td><?=e($h['judul_sebelum'])?></td>
@@ -260,6 +306,7 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
       </tr>
     <?php endwhile; ?>
     </tbody></table></div>
+    <?=render_pagination($historyPage,$historyTotalPages,$historyTotal,$historyOffset,$historyLimit,['page'=>'dashboard','history_q'=>$historySearch,'history_limit'=>$historyLimit],'history_page','#riwayat-revisi-judul','riwayat revisi judul')?>
   <?php endif; ?>
 </section>
 <?php endif; ?><script>
