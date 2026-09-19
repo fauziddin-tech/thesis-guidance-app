@@ -10,4 +10,6 @@
 .profile-photo-wrap{width:84px;height:84px;flex:0 0 84px}
 .profile-photo{width:84px;height:84px;border-radius:50%;object-fit:cover;border:1px solid #d4dde5;background:#f1f4f6}
 .profile-photo-placeholder{display:flex;align-items:center;justify-content:center;color:#71808e;font-size:12px;font-weight:700}
-
+.impersonation-banner{background:#fff3cd;border-bottom:2px solid #f0ad00;color:#664d03;padding:10px 0;font-size:14px}
+.impersonation-banner .container{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.impersonate-form{display:inline-flex;gap:6px;flex-wrap:wrap}

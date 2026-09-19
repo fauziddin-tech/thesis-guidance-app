@@ -16,7 +16,10 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
 ?>
 <div class="page-head">
   <div><h1>Detail Bimbingan</h1><p class="muted">Riwayat dokumen, status review, dan perkembangan skripsi.</p></div>
-  <a class="btn btn-secondary" href="?page=dashboard">Kembali ke Dashboard</a>
+  <div class="actions">
+    <a class="btn btn-secondary" href="?page=dashboard">Kembali ke Dashboard</a>
+    <?php if(in_array($u['role'],['dosen','admin'],true)&&empty($_SESSION['impersonator'])): ?><?=impersonate_form((int)$b['mahasiswa_id'],(string)$b['mahasiswa_nama'])?><?php endif; ?>
+  </div>
 </div>
 
 <div class="detail-grid">
@@ -106,9 +109,14 @@ foreach($rows as $row){$babByName[$row['nama_bab']][]=$row;}
         $js->bind_param('i',$id);$js->execute();$titleHistory=$js->get_result()->fetch_all(MYSQLI_ASSOC);$js->close();
         ?>
         <?php if(!$titleHistory): ?><div class="empty-state">Belum ada riwayat revisi judul.</div>
-        <?php else: ?><div class="title-history"><?php foreach($titleHistory as $th): ?>
+        <?php else: ?><div class="title-history"><?php $latestTitleId=(int)$titleHistory[0]['id']; foreach($titleHistory as $th):
+            $isPendingReview=$th['status']==='diajukan_ulang' && (int)$th['id']===$latestTitleId && $b['status']==='pengajuan_judul';
+            $isSuperseded=$th['status']==='diajukan_ulang' && !$isPendingReview;
+            $historyBadge=$th['status']==='disetujui' ? 'disetujui' : ($isPendingReview ? 'menunggu_review' : ($isSuperseded ? 'sudah_ditinjau' : 'revisi_judul'));
+          ?>
           <article class="title-history-item">
-            <div class="title-history-head"><strong>Revisi Judul #<?=e($th['id'])?></strong><span><?=getStatusBadge($th['status']==='diajukan_ulang'?'menunggu_review':($th['status']==='disetujui'?'disetujui':'revisi_judul'))?></span></div>
+            <div class="title-history-head"><strong>Revisi Judul #<?=e($th['id'])?></strong><span><?=getStatusBadge($historyBadge)?></span></div>
+            <?php if($isSuperseded): ?><p class="muted" style="margin:6px 0 10px">Pengajuan ulang ini sudah ditinjau dosen dan dilanjutkan dengan proses berikutnya.</p><?php endif; ?>
             <div class="detail-meta">
               <div class="meta-item"><div class="meta-label">Judul Sebelum</div><div class="meta-value"><?=e($th['judul_sebelum'])?></div></div>
               <?php if($th['judul_sesudah']): ?><div class="meta-item"><div class="meta-label">Judul Setelah Revisi</div><div class="meta-value"><?=e($th['judul_sesudah'])?></div></div><?php endif; ?>

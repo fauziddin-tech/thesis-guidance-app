@@ -14,6 +14,7 @@ Aplikasi manajemen bimbingan skripsi berbasis PHP Native + MySQL.
 - Review/revisi dosen
 - Dashboard dasar untuk mahasiswa, dosen, dan admin
 - Admin dapat membuat akun dosen dari Dashboard Admin
+- Admin dan dosen dapat membuka akun mahasiswa (login sebagai) untuk menelusuri kendala; akses tercatat di tabel impersonation_logs
 - Notifikasi, konsultasi, dan jadwal seminar sudah disiapkan di skema database untuk tahap berikutnya
 
 ## Instalasi
