@@ -37,18 +37,24 @@ if($action==='login'){
 }
 
 if($action==='register'){
-    verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$telp=trim($_POST['no_telp']??'');$dosen=(int)($_POST['dosen_pembimbing_id']??0);$password=$_POST['password']??'';$confirm=$_POST['confirm_password']??'';
+    verify_csrf(); $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$telp=trim($_POST['no_telp']??'');$telpDb=$telp!==''?$telp:null;$dosen=(int)($_POST['dosen_pembimbing_id']??0);$password=$_POST['password']??'';$confirm=$_POST['confirm_password']??'';
     if(strpos($username,'@')!==false){flash('danger','Username tidak boleh mengandung karakter @. Gunakan username biasa.');redirect('?page=register');}
     if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||$dosen<1||strlen($password)<8||$password!==$confirm){flash('danger','Data pendaftaran tidak valid. Password minimal 8 karakter.');redirect('?page=register');}
+    if($telp!==''&&!preg_match('/^[0-9+\-\s()]{5,20}$/',$telp)){flash('danger','Nomor HP/telepon tidak valid.');redirect('?page=register');}
     $s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen' LIMIT 1");$s->bind_param('i',$dosen);$s->execute();$validDosen=$s->get_result()->num_rows>0;$s->close();if(!$validDosen){flash('danger','Dosen pembimbing tidak valid. Silakan pilih dosen yang tersedia.');redirect('?page=register');}
-    $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp,dosen_pembimbing_id) VALUES(?,?,?,?,?,?,?)');$s->bind_param('ssssssi',$username,$email,$hash,$role,$nama,$telp,$dosen);
+    $s=$conn->prepare('SELECT id,email,no_telp FROM users WHERE email=? OR (no_telp IS NOT NULL AND no_telp<>? AND no_telp=?) LIMIT 1');$s->bind_param('sss',$email,$telpDb,$telpDb);$s->execute();$duplicate=$s->get_result()->fetch_assoc();$s->close();
+    if($duplicate){$field=!empty($duplicate['email'])&&strcasecmp($duplicate['email'],$email)===0?'email':'nomor HP';flash('danger','Pendaftaran ditolak. '.$field.' tersebut sudah terdaftar pada akun lain.');redirect('?page=register');}
+    $hash=password_hash($password,PASSWORD_DEFAULT);$role='mahasiswa';$s=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp,dosen_pembimbing_id) VALUES(?,?,?,?,?,?,?)');$s->bind_param('ssssssi',$username,$email,$hash,$role,$nama,$telpDb,$dosen);
     if($s->execute()) flash('success','Registrasi berhasil. Silakan login.'); else flash('danger','Registrasi gagal. Username/email mungkin sudah digunakan.');$s->close();redirect('?page=login');
 }
 
 if($action==='update_profile'){
     require_login();verify_csrf();$uid=(int)$_SESSION['user']['id'];$nama=trim($_POST['nama_lengkap']??'');$email=trim($_POST['email']??'');$telp=trim($_POST['no_telp']??'');
     if($nama===''||!filter_var($email,FILTER_VALIDATE_EMAIL)){flash('danger','Nama lengkap dan email yang valid wajib diisi.');redirect('?page=profile');}
+    if($telp!==''&&!preg_match('/^[0-9+\-\s()]{5,20}$/',$telp)){flash('danger','Nomor HP/telepon tidak valid.');redirect('?page=profile');}
     $s=$conn->prepare('SELECT id FROM users WHERE email=? AND id<>? LIMIT 1');$s->bind_param('si',$email,$uid);$s->execute();$exists=$s->get_result()->num_rows>0;$s->close();if($exists){flash('danger','Email sudah digunakan pengguna lain.');redirect('?page=profile');}
+    $s=$conn->prepare('SELECT id FROM users WHERE no_telp=? AND id<>? AND no_telp IS NOT NULL AND no_telp<>? LIMIT 1');$s->bind_param('sis',$telp,$uid,$telp);$s->execute();$phoneExists=$s->get_result()->num_rows>0;$s->close();if($telp!==''&&$phoneExists){flash('danger','Nomor HP sudah digunakan pengguna lain.');redirect('?page=profile');}
+    $telpDb=$telp!==''?$telp:null;
     $photoPath=null;$photo=$_FILES['profile_photo']??null;
     if($photo&&$photo['error']!==UPLOAD_ERR_NO_FILE){
         if($photo['error']!==UPLOAD_ERR_OK||$photo['size']>2*1024*1024){flash('danger','Foto profil maksimal 2 MB.');redirect('?page=profile');}
@@ -58,7 +64,7 @@ if($action==='update_profile'){
         if(!move_uploaded_file($photo['tmp_name'],__DIR__.'/'.$photoPath)){flash('danger','Foto profil gagal disimpan.');redirect('?page=profile');}
     }
     $oldPhoto=null;$s=$conn->prepare('SELECT profile_photo FROM users WHERE id=? LIMIT 1');$s->bind_param('i',$uid);$s->execute();$oldPhoto=$s->get_result()->fetch_assoc()['profile_photo']??null;$s->close();
-    if($photoPath){$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=?,profile_photo=? WHERE id=?');$s->bind_param('ssssi',$nama,$email,$telp,$photoPath,$uid);}else{$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=? WHERE id=?');$s->bind_param('sssi',$nama,$email,$telp,$uid);}
+    if($photoPath){$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=?,profile_photo=? WHERE id=?');$s->bind_param('ssssi',$nama,$email,$telpDb,$photoPath,$uid);}else{$s=$conn->prepare('UPDATE users SET nama_lengkap=?,email=?,no_telp=? WHERE id=?');$s->bind_param('sssi',$nama,$email,$telpDb,$uid);}
     if($s->execute()){
         $_SESSION['user']['nama_lengkap']=$nama;$_SESSION['user']['email']=$email;$_SESSION['user']['no_telp']=$telp;if($photoPath)$_SESSION['user']['profile_photo']=$photoPath; send_user_email($conn,$uid,'Profil MyThesis diperbarui','Profil berhasil diperbarui','Informasi profil akun Anda telah diperbarui. Jika Anda tidak melakukan perubahan ini, segera hubungi administrator.','?page=profile','Buka Profil');
         if($photoPath&&$oldPhoto&&strpos($oldPhoto,'uploads/profil/')===0){$oldReal=realpath(__DIR__.'/'.$oldPhoto);$base=realpath(__DIR__.'/uploads/profil');if($oldReal&&$base&&strpos($oldReal,$base.DIRECTORY_SEPARATOR)===0)@unlink($oldReal);}
@@ -196,6 +202,22 @@ if($action==='admin_create_dosen'){
         flash('danger',($r['error']??'')==='Username atau email sudah terdaftar.'?'Username atau email sudah terdaftar.':'Akun dosen gagal dibuat. Silakan coba lagi.');
     }
     redirect('?page=admin-dashboard#tambah-dosen');
+}
+
+if($action==='admin_delete_user'){
+    require_role(['admin']);verify_csrf();$target=(int)($_POST['user_id']??0);
+    if($target<1){flash('danger','Akun yang akan dihapus tidak valid.');redirect('?page=admin-dashboard');}
+    if($target===(int)$_SESSION['user']['id']){flash('danger','Akun admin yang sedang digunakan tidak dapat dihapus dari panel ini.');redirect('?page=admin-dashboard');}
+    $s=$conn->prepare('SELECT id,role,nama_lengkap,profile_photo FROM users WHERE id=? LIMIT 1');$s->bind_param('i',$target);$s->execute();$account=$s->get_result()->fetch_assoc();$s->close();
+    if(!$account){flash('danger','Akun tidak ditemukan.');redirect('?page=admin-dashboard');}
+    $files=[];
+    if(!empty($account['profile_photo']))$files[]=$account['profile_photo'];
+    foreach(['uploads/bab','uploads/revisi','uploads/konsultasi'] as $dir){$s=$conn->prepare("SELECT file_path FROM ".($dir==='uploads/bab'?'bab_skripsi':($dir==='uploads/revisi'?'revisi':'konsultasi'))." WHERE ".($dir==='uploads/bab'?'bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)':($dir==='uploads/revisi'?'bab_id IN (SELECT bs.id FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id WHERE b.mahasiswa_id=? OR b.dosen_id=?)':'bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)')));$s->bind_param('ii',$target,$target);$s->execute();$rs=$s->get_result();while($row=$rs->fetch_assoc()){if(!empty($row['file_path']))$files[]=$row['file_path'];}$s->close();}
+    $conn->begin_transaction();try{$s=$conn->prepare('DELETE FROM users WHERE id=?');$s->bind_param('i',$target);if(!$s->execute())throw new Exception();if($s->affected_rows!==1)throw new Exception();$s->close();$conn->commit();
+        $base=realpath(__DIR__.'/uploads');if($base){foreach(array_unique($files) as $path){if(strpos($path,'uploads/')!==0)continue;$real=realpath(__DIR__.'/'.$path);if($real&&strpos($real,$base.DIRECTORY_SEPARATOR)===0)@unlink($real);}}
+        flash('success','Akun '.$account['nama_lengkap'].' berhasil dihapus.');
+    }catch(Throwable $e){$conn->rollback();flash('danger','Akun gagal dihapus. Data tidak diubah.');}
+    redirect('?page=admin-dashboard');
 }
 
 if($action==='mark_all_notifications_read'){
