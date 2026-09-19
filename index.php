@@ -12,6 +12,10 @@ function require_login(): void { if (empty($_SESSION['user'])) redirect('?page=l
 function require_role(array $roles): void { require_login(); if (!in_array($_SESSION['user']['role']??'', $roles, true)) { http_response_code(403); exit('Akses ditolak.'); } }
 function flash(string $type,string $message): void { $_SESSION['flash']=['type'=>$type,'message'=>$message]; }
 function take_flash(): ?array { $f=$_SESSION['flash']??null; unset($_SESSION['flash']); return $f; }
+function admin_back(string $default='?page=admin-dashboard'): string {
+    $b=(string)($_POST['back']??'');
+    return preg_match('/^\?page=admin-dashboard(&[A-Za-z0-9_]+=[A-Za-z0-9_%.+\-]*)*\z/',$b)?$b:$default;
+}
 function impersonation_stop(mysqli $conn): bool {
     $imp=$_SESSION['impersonator']??null;if(!$imp)return false;
     $lid=(int)($imp['log_id']??0);
@@ -49,7 +53,7 @@ if(!empty($_SESSION['impersonator'])){
 if($action==='impersonate_start'){
     require_role(['admin','dosen']);verify_csrf();
     $actor=$_SESSION['user'];$actorId=(int)$actor['id'];$targetId=(int)($_POST['user_id']??0);$mode=(($_POST['mode']??'view')==='act')?'act':'view';
-    $back=$actor['role']==='admin'?'?page=admin-dashboard#manajemen-akun':'?page=dashboard';
+    $back=$actor['role']==='admin'?'?page=admin-dashboard&tab=akun':'?page=dashboard';
     $s=$conn->prepare("SELECT id,username,email,role,nama_lengkap,no_telp,profile_photo,dosen_pembimbing_id FROM users WHERE id=? AND role='mahasiswa' LIMIT 1");$s->bind_param('i',$targetId);$s->execute();$target=$s->get_result()->fetch_assoc();$s->close();
     if(!$target){flash('danger','Akun mahasiswa tidak ditemukan.');redirect($back);}
     if($actor['role']==='dosen'){
@@ -77,7 +81,7 @@ if($action==='impersonate_stop'){
     require_login();verify_csrf();
     $wasAdmin=(($_SESSION['impersonator']['role']??'')==='admin');
     if(impersonation_stop($conn))flash('success','Anda kembali ke akun Anda.');
-    redirect($wasAdmin?'?page=admin-dashboard#manajemen-akun':'?page=dashboard');
+    redirect($wasAdmin?'?page=admin-dashboard&tab=akun':'?page=dashboard');
 }
 
 if($action==='logout'){
@@ -241,11 +245,11 @@ if($action==='approve_bab'){
 }
 
 if($action==='admin_assign_dosen'){
-    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$did=(int)($_POST['dosen_id']??0);$s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen'");$s->bind_param('i',$did);$s->execute();$ok=$s->get_result()->num_rows>0;$s->close();if($ok){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();$s=$conn->prepare('UPDATE bimbingan SET dosen_id=? WHERE id=?');$s->bind_param('ii',$did,$bid);$s->execute();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'dosen_diubah','Dosen pembimbing untuk bimbingan Anda telah diperbarui.','?page=bimbingan-detail&id='.$bid);flash('success','Dosen pembimbing diperbarui.');}else flash('danger','Dosen tidak valid.');redirect('?page=admin-dashboard');
+    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$did=(int)($_POST['dosen_id']??0);$s=$conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen'");$s->bind_param('i',$did);$s->execute();$ok=$s->get_result()->num_rows>0;$s->close();if($ok){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();$s=$conn->prepare('UPDATE bimbingan SET dosen_id=? WHERE id=?');$s->bind_param('ii',$did,$bid);$s->execute();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'dosen_diubah','Dosen pembimbing untuk bimbingan Anda telah diperbarui.','?page=bimbingan-detail&id='.$bid);flash('success','Dosen pembimbing diperbarui.');}else flash('danger','Dosen tidak valid.');redirect(admin_back('?page=admin-dashboard&tab=bimbingan'));
 }
 
 if($action==='admin_bimbingan_status'){
-    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$status=$_POST['status']??'';require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->updateStatus($bid,$status);if($r['success']){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'status_bimbingan','Status bimbingan Anda telah diperbarui menjadi: '.$status.'.','?page=bimbingan-detail&id='.$bid);}flash($r['success']?'success':'danger',$r['success']?'Status bimbingan diperbarui.':'Gagal memperbarui status.');redirect('?page=admin-dashboard');
+    require_role(['admin']);verify_csrf();$bid=(int)($_POST['bimbingan_id']??0);$status=$_POST['status']??'';require_once __DIR__.'/src/controllers/BimbinganController.php';$ctrl=new BimbinganController($conn);$r=$ctrl->updateStatus($bid,$status);if($r['success']){$s=$conn->prepare('SELECT mahasiswa_id FROM bimbingan WHERE id=? LIMIT 1');$s->bind_param('i',$bid);$s->execute();$m=$s->get_result()->fetch_assoc();$s->close();if($m)notify_user($conn,(int)$m['mahasiswa_id'],'status_bimbingan','Status bimbingan Anda telah diperbarui menjadi: '.$status.'.','?page=bimbingan-detail&id='.$bid);}flash($r['success']?'success':'danger',$r['success']?'Status bimbingan diperbarui.':'Gagal memperbarui status.');redirect(admin_back('?page=admin-dashboard&tab=bimbingan'));
 }
 
 if($action==='admin_create_dosen'){
@@ -259,7 +263,7 @@ if($action==='admin_create_dosen'){
     elseif($telp!==''&&!preg_match('/^[0-9+\-\s()]{5,15}$/',$telp)) $formError='No. telepon tidak valid.';
     elseif(strlen($password)<8||strlen($password)>72) $formError='Password harus 8–72 karakter.';
     elseif($password!==$confirm) $formError='Konfirmasi password tidak cocok.';
-    if($formError!==null){flash('danger',$formError);redirect('?page=admin-dashboard#tambah-dosen');}
+    if($formError!==null){flash('danger',$formError);redirect('?page=admin-dashboard&tab=dosen');}
     require_once __DIR__.'/src/controllers/UserController.php';$ctrl=new UserController($conn);$r=$ctrl->create($username,$email,$nama,$password,'dosen',$telp);
     if(!empty($r['success'])){
         unset($_SESSION['old_dosen_form']);
@@ -268,15 +272,15 @@ if($action==='admin_create_dosen'){
     }else{
         flash('danger',($r['error']??'')==='Username atau email sudah terdaftar.'?'Username atau email sudah terdaftar.':'Akun dosen gagal dibuat. Silakan coba lagi.');
     }
-    redirect('?page=admin-dashboard#tambah-dosen');
+    redirect('?page=admin-dashboard&tab=dosen');
 }
 
 if($action==='admin_delete_user'){
     require_role(['admin']);verify_csrf();$target=(int)($_POST['user_id']??0);
-    if($target<1){flash('danger','Akun yang akan dihapus tidak valid.');redirect('?page=admin-dashboard');}
-    if($target===(int)$_SESSION['user']['id']){flash('danger','Akun admin yang sedang digunakan tidak dapat dihapus dari panel ini.');redirect('?page=admin-dashboard');}
+    if($target<1){flash('danger','Akun yang akan dihapus tidak valid.');redirect(admin_back('?page=admin-dashboard&tab=akun'));}
+    if($target===(int)$_SESSION['user']['id']){flash('danger','Akun admin yang sedang digunakan tidak dapat dihapus dari panel ini.');redirect(admin_back('?page=admin-dashboard&tab=akun'));}
     $s=$conn->prepare('SELECT id,role,nama_lengkap,profile_photo FROM users WHERE id=? LIMIT 1');$s->bind_param('i',$target);$s->execute();$account=$s->get_result()->fetch_assoc();$s->close();
-    if(!$account){flash('danger','Akun tidak ditemukan.');redirect('?page=admin-dashboard');}
+    if(!$account){flash('danger','Akun tidak ditemukan.');redirect(admin_back('?page=admin-dashboard&tab=akun'));}
     $files=[];
     if(!empty($account['profile_photo']))$files[]=$account['profile_photo'];
     $s=$conn->prepare('SELECT file_path FROM bab_skripsi WHERE bimbingan_id IN (SELECT id FROM bimbingan WHERE mahasiswa_id=? OR dosen_id=?)');
@@ -289,7 +293,7 @@ if($action==='admin_delete_user'){
         $base=realpath(__DIR__.'/uploads');if($base){foreach(array_unique($files) as $path){if(strpos($path,'uploads/')!==0)continue;$real=realpath(__DIR__.'/'.$path);if($real&&strpos($real,$base.DIRECTORY_SEPARATOR)===0)@unlink($real);}}
         flash('success','Akun '.$account['nama_lengkap'].' berhasil dihapus.');
     }catch(Throwable $e){$conn->rollback();flash('danger','Akun gagal dihapus. Data tidak diubah.');}
-    redirect('?page=admin-dashboard');
+    redirect(admin_back('?page=admin-dashboard&tab=akun'));
 }
 
 if($action==='mark_all_notifications_read'){
