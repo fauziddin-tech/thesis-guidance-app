@@ -15,6 +15,39 @@ function getStatusBadge(string $status): string {
     $labels=['pengajuan_judul'=>'Pengajuan Judul','revisi_judul'=>'Revisi Judul','diminta'=>'Menunggu Revisi Judul','diajukan_ulang'=>'Diajukan Ulang','menunggu_review'=>'Menunggu Review','disetujui'=>'Disetujui','ditangguhkan'=>'Ditangguhkan'];
     $class=$map[$status]??'secondary'; $label=$labels[$status]??ucfirst(str_replace('_',' ',$status)); return '<span class="badge badge-'.$class.'">'.e($label).'</span>';
 }
+
+if (!function_exists('render_pagination')) {
+    function render_pagination(int $page, int $totalPages, int $total, int $offset, int $limit, array $params = [], string $pageParam = 'list_page', string $anchor = '', string $label = 'data'): string {
+        $page=max(1,$page); $totalPages=max(1,$totalPages); $limit=max(1,$limit);
+        $pageNumbers=[1];
+        $start=max(2,$page-2);
+        $end=min($totalPages-1,$page+2);
+        for($p=$start;$p<=$end;$p++) $pageNumbers[]=$p;
+        if($totalPages>1) $pageNumbers[]=$totalPages;
+        $pageNumbers=array_values(array_unique($pageNumbers));
+        $buildUrl=function(int $targetPage) use ($params,$pageParam,$anchor): string {
+            $q=$params; $q[$pageParam]=$targetPage;
+            return '?'.http_build_query($q).$anchor;
+        };
+        ob_start();
+        ?>
+        <div class="account-pagination">
+          <div class="account-pagination-info">Menampilkan <?=e($total ? $offset+1 : 0)?>–<?=e(min($offset+$limit,$total))?> dari <?=e($total)?> <?=e($label)?></div>
+          <div class="account-pagination-controls">
+            <?php if($page>1): ?><a class="account-page-link" href="<?=e($buildUrl($page-1))?>">‹ Sebelumnya</a><?php else: ?><span class="account-page-link disabled">‹ Sebelumnya</span><?php endif; ?>
+            <?php $previousPage=0; foreach($pageNumbers as $p): ?>
+              <?php if($previousPage && $p>$previousPage+1): ?><span class="account-page-ellipsis">…</span><?php endif; ?>
+              <?php if($p===$page): ?><span class="account-page-link active" aria-current="page"><?=$p?></span><?php else: ?><a class="account-page-link" href="<?=e($buildUrl($p))?>"><?=$p?></a><?php endif; ?>
+              <?php $previousPage=$p; ?>
+            <?php endforeach; ?>
+            <?php if($page<$totalPages): ?><a class="account-page-link" href="<?=e($buildUrl($page+1))?>">Berikutnya ›</a><?php else: ?><span class="account-page-link disabled">Berikutnya ›</span><?php endif; ?>
+          </div>
+        </div>
+        <?php
+        return (string)ob_get_clean();
+    }
+}
+
 function isAuthenticated(): bool { return isset($_SESSION['user']); }
 function hasRole(string $role): bool { return isAuthenticated() && ($_SESSION['user']['role']??'')===$role; }
 function getCurrentUser(): ?array { return $_SESSION['user']??null; }
