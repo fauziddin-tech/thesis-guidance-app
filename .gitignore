@@ -2,5 +2,8 @@
 /storage/uploads/*
 !/storage/uploads/.htaccess
 !/storage/uploads/index.html
+/storage/avatars/*
+!/storage/avatars/.htaccess
+!/storage/avatars/index.html
 *.log
 error_log

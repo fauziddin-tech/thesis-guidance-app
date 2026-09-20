@@ -6,6 +6,7 @@ MyThesis adalah aplikasi bimbingan skripsi berbasis PHP dan MySQL untuk mengelol
 
 - Dashboard terpisah untuk mahasiswa dan dosen
 - Dashboard administrator untuk membuat akun dosen dan relasi bimbingan
+- Foto profil untuk mahasiswa, dosen, dan administrator tanpa migrasi database
 - Unggah dokumen PDF, DOC, dan DOCX dengan versioning otomatis
 - Antrean review, catatan revisi, dan persetujuan dokumen
 - Unduhan dokumen dengan pemeriksaan hak akses
@@ -31,3 +32,5 @@ MyThesis adalah aplikasi bimbingan skripsi berbasis PHP dan MySQL untuk mengelol
 6. Buka aplikasi dan daftarkan akun mahasiswa. Akun dosen harus dibuat oleh administrator.
 
 Jangan mengunggah `config/database.local.php`, file log, atau dokumen pengguna ke GitHub. Lihat `INSTALASI.md` untuk panduan cPanel dan `DEPLOYMENT.md` untuk pembaruan melalui terminal.
+
+Konfigurasi lokal lama yang menggunakan konstanta `DB_HOST`, `DB_USER`, `DB_PASS`, dan `DB_NAME` tetap didukung untuk memudahkan upgrade.

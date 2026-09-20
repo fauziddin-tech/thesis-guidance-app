@@ -67,6 +67,36 @@ if ($page === 'logout') {
     exit;
 }
 
+if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
+    if (!isset($_SESSION['user'])) {
+        http_response_code(401);
+        exit('Silakan masuk untuk melihat foto profil.');
+    }
+
+    $avatarDirectory = __DIR__ . '/storage/avatars';
+    $avatarPath = false;
+    $avatarMime = '';
+    foreach (['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'] as $extension => $mime) {
+        $candidate = $avatarDirectory . '/user-' . (int)$_SESSION['user']['id'] . '.' . $extension;
+        if (is_file($candidate)) {
+            $avatarPath = $candidate;
+            $avatarMime = $mime;
+            break;
+        }
+    }
+
+    if (!$avatarPath) {
+        http_response_code(404);
+        exit('Foto profil belum tersedia.');
+    }
+
+    header('Content-Type: ' . $avatarMime);
+    header('Content-Length: ' . filesize($avatarPath));
+    header('Cache-Control: private, max-age=3600');
+    readfile($avatarPath);
+    exit;
+}
+
 if (isset($_GET['action']) && $_GET['action'] === 'download') {
     if (!isset($_SESSION['user'])) {
         http_response_code(401);

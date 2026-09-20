@@ -24,6 +24,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = isset($_POST['action']) ? (string)$_POST['action'] : '';
 
+    if ($action === 'update_avatar') {
+        $file = $_FILES['foto_profil'] ?? null;
+        $mimeToExtension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
+        $mime = '';
+        if ($file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {$mime = (string)finfo_file($finfo, $file['tmp_name']);finfo_close($finfo);}
+        }
+        $imageInfo = $file && is_uploaded_file($file['tmp_name'] ?? '') ? @getimagesize($file['tmp_name']) : false;
+
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) set_flash('danger', 'Foto gagal diterima. Pilih kembali file foto.');
+        elseif (($file['size'] ?? 0) < 1 || $file['size'] > 2 * 1024 * 1024) set_flash('danger', 'Ukuran foto maksimal 2 MB.');
+        elseif (!$imageInfo || !isset($mimeToExtension[$mime])) set_flash('danger', 'Format foto tidak valid. Gunakan JPG, PNG, atau WebP.');
+        else {
+            $avatarDirectory = __DIR__ . '/../../storage/avatars';
+            if (!is_dir($avatarDirectory)) mkdir($avatarDirectory, 0750, true);
+            $extension = $mimeToExtension[$mime];
+            $destination = $avatarDirectory . '/user-' . $userId . '.' . $extension;
+            if (!move_uploaded_file($file['tmp_name'], $destination)) set_flash('danger', 'Foto belum dapat disimpan. Periksa izin folder penyimpanan.');
+            else {
+                foreach (['jpg', 'png', 'webp'] as $oldExtension) {
+                    $oldPath = $avatarDirectory . '/user-' . $userId . '.' . $oldExtension;
+                    if ($oldPath !== $destination && is_file($oldPath)) unlink($oldPath);
+                }
+                set_flash('success', 'Foto profil berhasil diperbarui.');
+            }
+        }
+        $redirectDashboard();
+    }
+
     if ($action === 'upload_chapter' && $role === 'mahasiswa') {
         $guidanceId = filter_input(INPUT_POST, 'bimbingan_id', FILTER_VALIDATE_INT);
         $chapterName = trim((string)($_POST['nama_bab'] ?? ''));
@@ -159,8 +189,18 @@ if ($role === 'mahasiswa') {
 $pendingCount = count(array_filter($documents, function ($item) use ($role) {
     return $role === 'mahasiswa' ? $item['status'] === 'direvisi' : $item['status'] === 'menunggu_review';
 }));
+$avatarPath = '';
+$avatarVersion = '';
+foreach (['jpg', 'png', 'webp'] as $extension) {
+    $candidate = __DIR__ . '/../../storage/avatars/user-' . $userId . '.' . $extension;
+    if (is_file($candidate)) {$avatarPath = '?action=avatar';$avatarVersion = (string)filemtime($candidate);break;}
+}
+$nameParts = preg_split('/\s+/', trim((string)$user['nama_lengkap']));
+$initials = '';
+foreach (array_slice(array_filter($nameParts), 0, 2) as $part) $initials .= strtoupper(substr($part, 0, 1));
+if ($initials === '') $initials = 'U';
 ?>
-<div class="page-head"><div><span class="eyebrow">RUANG KERJA <?=h(strtoupper($role))?></span><h1>Selamat datang, <?=h($user['nama_lengkap'])?>.</h1><p><?=h($role==='mahasiswa'?'Pantau bimbingan dan kelola dokumen skripsi Anda.':($role==='dosen'?'Tinjau dokumen dan berikan arahan secara teratur.':'Kelola akun dosen dan relasi bimbingan dari satu halaman.'))?></p></div><span class="role-badge"><?=h(ucfirst($role))?></span></div>
+<div class="page-head"><div class="page-head-copy"><span class="eyebrow">RUANG KERJA <?=h(strtoupper($role))?></span><h1>Selamat datang, <?=h($user['nama_lengkap'])?></h1><p><?=h($role==='mahasiswa'?'Pantau bimbingan dan kelola dokumen skripsi Anda.':($role==='dosen'?'Tinjau dokumen dan berikan arahan secara teratur.':'Kelola akun dosen dan relasi bimbingan dari satu halaman.'))?></p></div><details class="profile-menu"><summary><span class="profile-avatar"><?php if($avatarPath): ?><img src="<?=h($avatarPath)?>&amp;v=<?=h($avatarVersion)?>" alt="Foto profil <?=h($user['nama_lengkap'])?>"><?php else: ?><span aria-hidden="true"><?=h($initials)?></span><?php endif; ?></span><span class="profile-summary-copy"><strong><?=h(ucfirst($role))?></strong><small>Ganti foto</small></span></summary><div class="profile-popover"><strong>Foto profil</strong><p>Gunakan foto JPG, PNG, atau WebP maksimal 2 MB.</p><form method="post" enctype="multipart/form-data"><?=csrf_field()?><input type="hidden" name="action" value="update_avatar"><label class="sr-only" for="foto_profil">Pilih foto profil</label><input id="foto_profil" name="foto_profil" type="file" accept="image/jpeg,image/png,image/webp" required><button class="btn btn-primary btn-small btn-block" type="submit">Simpan Foto</button></form></div></details></div>
 <?php if($flash): ?><div class="alert alert-<?=h($flash['type'])?>" role="status" tabindex="-1" data-flash><?=h($flash['message'])?></div><?php endif; ?>
 <?php if($role==='mahasiswa'||$role==='dosen'): ?><section class="stats-grid" aria-label="Ringkasan dashboard"><article><span>Bimbingan</span><strong><?=count($guidances)?></strong><small>Total data bimbingan</small></article><article><span>Dokumen</span><strong><?=count($documents)?></strong><small>Seluruh versi dokumen</small></article><article><span><?=$role==='mahasiswa'?'Perlu ditindaklanjuti':'Antrean review'?></span><strong><?=$pendingCount?></strong><small>Status terbaru dokumen</small></article></section><?php endif; ?>
 
