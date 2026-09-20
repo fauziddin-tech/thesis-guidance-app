@@ -73,11 +73,30 @@ if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
         exit('Silakan masuk untuk melihat foto profil.');
     }
 
+    $currentUser = $_SESSION['user'];
+    $currentUserId = (int)$currentUser['id'];
+    $requestedUserId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    $requestedUserId = $requestedUserId ?: $currentUserId;
+    $isAllowed = $requestedUserId === $currentUserId || $currentUser['role'] === 'admin';
+
+    if (!$isAllowed && $currentUser['role'] === 'dosen') {
+        $stmt = $conn->prepare('SELECT id FROM bimbingan WHERE dosen_id=? AND mahasiswa_id=? LIMIT 1');
+        $stmt->bind_param('ii', $currentUserId, $requestedUserId);
+        $stmt->execute();
+        $isAllowed = (bool)$stmt->get_result()->fetch_assoc();
+        $stmt->close();
+    }
+
+    if (!$isAllowed) {
+        http_response_code(403);
+        exit('Anda tidak memiliki akses ke foto profil ini.');
+    }
+
     $avatarDirectory = __DIR__ . '/storage/avatars';
     $avatarPath = false;
     $avatarMime = '';
     foreach (['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp'] as $extension => $mime) {
-        $candidate = $avatarDirectory . '/user-' . (int)$_SESSION['user']['id'] . '.' . $extension;
+        $candidate = $avatarDirectory . '/user-' . $requestedUserId . '.' . $extension;
         if (is_file($candidate)) {
             $avatarPath = $candidate;
             $avatarMime = $mime;
