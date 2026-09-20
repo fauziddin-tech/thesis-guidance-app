@@ -1,11 +1,12 @@
 <?php
+ob_start();
 require_once __DIR__."/config/session.php";
 require_once __DIR__.'/src/helpers/RateLimit.php';
 require_once __DIR__.'/config/database.php';
 require_once __DIR__.'/src/helpers/Functions.php';
 require_once __DIR__.'/src/helpers/Email.php';
 
-function redirect(string $url): void { header('Location: '.$url); exit; }
+function redirect(string $url): void { while (ob_get_level() > 0) ob_end_clean(); header('Location: '.$url); exit; }
 function csrf_token(): string { if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token']=bin2hex(random_bytes(32)); return $_SESSION['csrf_token']; }
 function verify_csrf(): void { if (!hash_equals($_SESSION['csrf_token']??'', $_POST['csrf_token']??'')) { http_response_code(419); exit('Permintaan tidak valid. Silakan muat ulang halaman.'); } }
 function require_login(): void { if (empty($_SESSION['user'])) redirect('?page=login'); }

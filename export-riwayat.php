@@ -2,7 +2,12 @@
 require_once __DIR__."/config/session.php";
 require_once __DIR__.'/config/database.php';
 require_once __DIR__.'/src/helpers/Functions.php';
-require_login();
+
+// File ini dipanggil langsung (bukan lewat index.php), jadi require_login() tidak tersedia di sini.
+if (empty($_SESSION['user']['id'])) {
+    header('Location: index.php?page=login');
+    exit;
+}
 
 $uid=(int)$_SESSION['user']['id'];
 $format=$_GET['format']??'pdf';
