@@ -1,189 +1,30 @@
 <?php
-if (!isset($_SESSION['user'])) {
-    header('Location: ?page=login');
-    exit();
-}
-
-$user = $_SESSION['user'];
-$user_id = $user['id'];
-$role = $user['role'];
+$user=$_SESSION['user'];$userId=(int)$user['id'];$role=(string)$user['role'];
+$statusBadge=function(string $status): string{$class=in_array($status,['aktif','selesai','disetujui'],true)?'success':(in_array($status,['direvisi','pending'],true)?'warning':'secondary');return '<span class="badge badge-'.$class.'">'.htmlspecialchars(ucfirst(str_replace('_',' ',$status)),ENT_QUOTES,'UTF-8').'</span>';};
 ?>
+<div class="page-head"><div><span class="eyebrow">RUANG KERJA <?=htmlspecialchars(strtoupper($role),ENT_QUOTES,'UTF-8')?></span><h1>Selamat datang, <?=htmlspecialchars($user['nama_lengkap'],ENT_QUOTES,'UTF-8')?>.</h1><p><?= $role==='mahasiswa'?'Pantau bimbingan dan kelola dokumen skripsi Anda.':'Tinjau mahasiswa bimbingan dan berikan arahan secara teratur.' ?></p></div><span class="role-badge"><?=htmlspecialchars(ucfirst($role),ENT_QUOTES,'UTF-8')?></span></div>
 
-<div class="card">
-    <h2>Dashboard - Selamat datang, <?php echo htmlspecialchars($user['nama_lengkap']); ?></h2>
-    <p>Role: <strong><?php echo ucfirst($role); ?></strong></p>
-</div>
+<nav class="quick-actions" aria-label="Akses cepat dashboard">
+<?php if($role==='mahasiswa'): ?><a href="#bimbingan-saya"><span>01</span><div><strong>Lihat bimbingan</strong><small>Pantau judul, dosen, dan status</small></div></a><a href="#unggah-bab"><span>02</span><div><strong>Unggah naskah</strong><small>Kirim dokumen bab terbaru</small></div></a><?php elseif($role==='dosen'): ?><a href="#mahasiswa-bimbingan"><span>01</span><div><strong>Lihat mahasiswa</strong><small>Pantau bimbingan aktif</small></div></a><a href="#berikan-revisi"><span>02</span><div><strong>Berikan revisi</strong><small>Tulis arahan untuk dokumen</small></div></a><?php endif; ?>
+</nav>
 
-<?php if ($role === 'mahasiswa'): ?>
-    <!-- Dashboard Mahasiswa -->
-    <div class="card">
-        <h3>📚 Bimbingan Saya</h3>
-        
-        <?php
-        $query = "SELECT b.*, u.nama_lengkap as dosen_nama 
-                  FROM bimbingan b 
-                  JOIN users u ON b.dosen_id = u.id 
-                  WHERE b.mahasiswa_id = ?
-                  ORDER BY b.created_at DESC";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param('i', $user_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            echo '<table>';
-            echo '<tr><th>Judul Skripsi</th><th>Dosen Pembimbing</th><th>Status</th><th>Aksi</th></tr>';
-            
-            while ($row = $result->fetch_assoc()) {
-                echo '<tr>';
-                echo '<td>' . htmlspecialchars($row['judul_skripsi']) . '</td>';
-                echo '<td>' . htmlspecialchars($row['dosen_nama']) . '</td>';
-                echo '<td><span style="padding: 5px 10px; border-radius: 3px; background-color: ' . 
-                     ($row['status'] === 'aktif' ? '#27ae60' : '#e74c3c') . '; color: white;">' . 
-                     ucfirst($row['status']) . '</span></td>';
-                echo '<td>';
-                echo '<a href="#" class="btn btn-primary" style="font-size: 12px; padding: 5px 10px;">Detail</a>';
-                echo '</td>';
-                echo '</tr>';
-            }
-            echo '</table>';
-        } else {
-            echo '<p>Anda belum memiliki bimbingan. <a href="#">Buat bimbingan baru</a></p>';
-        }
-        $stmt->close();
-        ?>
-    </div>
-    
-    <div class="card">
-        <h3>📤 Unggah Bab Skripsi</h3>
-        <form method="POST" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="bimbingan_id">Pilih Bimbingan</label>
-                <select id="bimbingan_id" name="bimbingan_id" required>
-                    <option value="">-- Pilih --</option>
-                    <?php
-                    $query = "SELECT id, judul_skripsi FROM bimbingan WHERE mahasiswa_id = ? AND status = 'aktif'";
-                    $stmt = $conn->prepare($query);
-                    $stmt->bind_param('i', $user_id);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    while ($row = $result->fetch_assoc()) {
-                        echo '<option value="' . $row['id'] . '">' . htmlspecialchars($row['judul_skripsi']) . '</option>';
-                    }
-                    $stmt->close();
-                    ?>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="nama_bab">Nama Bab</label>
-                <input type="text" id="nama_bab" name="nama_bab" placeholder="cth: Bab I - Pendahuluan" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="file_bab">Upload File (PDF/DOC/DOCX)</label>
-                <input type="file" id="file_bab" name="file_bab" accept=".pdf,.doc,.docx" required>
-            </div>
-            
-            <button type="submit" class="btn btn-success">Unggah Bab</button>
-        </form>
-    </div>
-
-<?php elseif ($role === 'dosen'): ?>
-    <!-- Dashboard Dosen -->
-    <div class="card">
-        <h3>👥 Mahasiswa Bimbingan Saya</h3>
-        
-        <?php
-        $query = "SELECT b.*, u.nama_lengkap, u.email 
-                  FROM bimbingan b 
-                  JOIN users u ON b.mahasiswa_id = u.id 
-                  WHERE b.dosen_id = ?
-                  ORDER BY b.created_at DESC";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param('i', $user_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows > 0) {
-            echo '<table>';
-            echo '<tr><th>Nama Mahasiswa</th><th>Judul Skripsi</th><th>Status</th><th>Aksi</th></tr>';
-            
-            while ($row = $result->fetch_assoc()) {
-                echo '<tr>';
-                echo '<td>' . htmlspecialchars($row['nama_lengkap']) . '</td>';
-                echo '<td>' . htmlspecialchars($row['judul_skripsi']) . '</td>';
-                echo '<td><span style="padding: 5px 10px; border-radius: 3px; background-color: ' . 
-                     ($row['status'] === 'aktif' ? '#27ae60' : '#e74c3c') . '; color: white;">' . 
-                     ucfirst($row['status']) . '</span></td>';
-                echo '<td><a href="#" class="btn btn-primary" style="font-size: 12px; padding: 5px 10px;">Review</a></td>';
-                echo '</tr>';
-            }
-            echo '</table>';
-        } else {
-            echo '<p>Anda belum memiliki mahasiswa bimbingan.</p>';
-        }
-        $stmt->close();
-        ?>
-    </div>
-    
-    <div class="card">
-        <h3>✏️ Berikan Revisi</h3>
-        <form method="POST">
-            <div class="form-group">
-                <label for="bab_id">Pilih Bab</label>
-                <select id="bab_id" name="bab_id" required>
-                    <option value="">-- Pilih --</option>
-                    <?php
-                    $query = "SELECT bs.id, bs.nama_bab, u.nama_lengkap 
-                              FROM bab_skripsi bs 
-                              JOIN bimbingan b ON bs.bimbingan_id = b.id 
-                              JOIN users u ON b.mahasiswa_id = u.id 
-                              WHERE b.dosen_id = ?
-                              ORDER BY bs.uploaded_at DESC";
-                    $stmt = $conn->prepare($query);
-                    $stmt->bind_param('i', $user_id);
-                    $stmt->execute();
-                    $result = $stmt->get_result();
-                    while ($row = $result->fetch_assoc()) {
-                        echo '<option value="' . $row['id'] . '">' . htmlspecialchars($row['nama_bab'] . ' - ' . $row['nama_lengkap']) . '</option>';
-                    }
-                    $stmt->close();
-                    ?>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="komentar">Komentar Revisi</label>
-                <textarea id="komentar" name="komentar" required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="tipe_revisi">Tipe Revisi</label>
-                <select id="tipe_revisi" name="tipe_revisi" required>
-                    <option value="minor">Minor (perbaikan kecil)</option>
-                    <option value="major">Major (perubahan signifikan)</option>
-                    <option value="kritis">Kritis (perubahan mendesak)</option>
-                </select>
-            </div>
-            
-            <button type="submit" class="btn btn-success">Kirim Revisi</button>
-        </form>
-    </div>
-
-<?php endif; ?>
-
-<div class="card">
-    <form method="GET" style="text-align: center;">
-        <input type="hidden" name="page" value="logout">
-        <button type="submit" class="btn btn-danger">Logout</button>
-    </form>
-</div>
-
+<?php if($role==='mahasiswa'): ?>
+<section class="card" id="bimbingan-saya"><div class="section-heading"><span class="eyebrow">RINGKASAN</span><h2>Bimbingan Saya</h2><p>Daftar bimbingan dan status terbaru skripsi Anda.</p></div>
 <?php
-if (isset($_GET['page']) && $_GET['page'] === 'logout') {
-    session_destroy();
-    header('Location: ?page=home');
-    exit();
-}
-?>
+$stmt=$conn->prepare('SELECT b.*,u.nama_lengkap AS dosen_nama FROM bimbingan b JOIN users u ON b.dosen_id=u.id WHERE b.mahasiswa_id=? ORDER BY b.created_at DESC');$stmt->bind_param('i',$userId);$stmt->execute();$result=$stmt->get_result();
+if($result->num_rows>0): ?>
+<div class="table-wrap"><table><thead><tr><th>Judul Skripsi</th><th>Dosen Pembimbing</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($row=$result->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($row['judul_skripsi'],ENT_QUOTES,'UTF-8')?></strong></td><td><?=htmlspecialchars($row['dosen_nama'],ENT_QUOTES,'UTF-8')?></td><td><?=$statusBadge($row['status'])?></td><td><a href="#unggah-bab" class="btn btn-secondary btn-small">Kelola Dokumen</a></td></tr><?php endwhile; ?></tbody></table></div>
+<?php else: ?><div class="empty-state"><strong>Belum ada bimbingan.</strong><span>Hubungi administrator atau dosen untuk memulai data bimbingan.</span></div><?php endif;$stmt->close(); ?>
+</section>
+
+<section class="card" id="unggah-bab"><div class="section-heading"><span class="eyebrow">DOKUMEN</span><h2>Unggah Bab Skripsi</h2><p>Pilih bimbingan, tuliskan nama bab, kemudian unggah file PDF, DOC, atau DOCX.</p></div><form method="post" enctype="multipart/form-data"><div class="form-grid"><div class="form-group"><label for="bimbingan_id">Bimbingan</label><select id="bimbingan_id" name="bimbingan_id" required><option value="">Pilih bimbingan</option><?php $stmt=$conn->prepare("SELECT id,judul_skripsi FROM bimbingan WHERE mahasiswa_id=? AND status='aktif'");$stmt->bind_param('i',$userId);$stmt->execute();$active=$stmt->get_result();while($row=$active->fetch_assoc()): ?><option value="<?=(int)$row['id']?>"><?=htmlspecialchars($row['judul_skripsi'],ENT_QUOTES,'UTF-8')?></option><?php endwhile;$stmt->close(); ?></select></div><div class="form-group"><label for="nama_bab">Nama Bab</label><input type="text" id="nama_bab" name="nama_bab" placeholder="Contoh: Bab I - Pendahuluan" required></div></div><div class="form-group"><label for="file_bab">File Skripsi</label><input type="file" id="file_bab" name="file_bab" accept=".pdf,.doc,.docx" required><small class="field-help">Format yang diterima: PDF, DOC, dan DOCX.</small></div><button type="submit" class="btn btn-primary">Unggah Bab</button></form></section>
+
+<?php elseif($role==='dosen'): ?>
+<section class="card" id="mahasiswa-bimbingan"><div class="section-heading"><span class="eyebrow">RINGKASAN</span><h2>Mahasiswa Bimbingan Saya</h2><p>Daftar mahasiswa, judul skripsi, dan status bimbingan terbaru.</p></div>
+<?php $stmt=$conn->prepare('SELECT b.*,u.nama_lengkap,u.email FROM bimbingan b JOIN users u ON b.mahasiswa_id=u.id WHERE b.dosen_id=? ORDER BY b.created_at DESC');$stmt->bind_param('i',$userId);$stmt->execute();$result=$stmt->get_result();if($result->num_rows>0): ?>
+<div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul Skripsi</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($row=$result->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($row['nama_lengkap'],ENT_QUOTES,'UTF-8')?></strong><small class="table-subtext"><?=htmlspecialchars($row['email'],ENT_QUOTES,'UTF-8')?></small></td><td><?=htmlspecialchars($row['judul_skripsi'],ENT_QUOTES,'UTF-8')?></td><td><?=$statusBadge($row['status'])?></td><td><a href="#berikan-revisi" class="btn btn-secondary btn-small">Beri Revisi</a></td></tr><?php endwhile; ?></tbody></table></div>
+<?php else: ?><div class="empty-state"><strong>Belum ada mahasiswa bimbingan.</strong><span>Data akan tampil setelah mahasiswa ditugaskan kepada Anda.</span></div><?php endif;$stmt->close(); ?>
+</section>
+
+<section class="card" id="berikan-revisi"><div class="section-heading"><span class="eyebrow">TINDAK LANJUT</span><h2>Berikan Revisi</h2><p>Pilih dokumen dan tuliskan catatan yang spesifik serta mudah ditindaklanjuti.</p></div><form method="post"><div class="form-group"><label for="bab_id">Dokumen Bab</label><select id="bab_id" name="bab_id" required><option value="">Pilih dokumen</option><?php $stmt=$conn->prepare('SELECT bs.id,bs.nama_bab,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id JOIN users u ON b.mahasiswa_id=u.id WHERE b.dosen_id=? ORDER BY bs.uploaded_at DESC');$stmt->bind_param('i',$userId);$stmt->execute();$chapters=$stmt->get_result();while($row=$chapters->fetch_assoc()): ?><option value="<?=(int)$row['id']?>"><?=htmlspecialchars($row['nama_bab'].' — '.$row['nama_lengkap'],ENT_QUOTES,'UTF-8')?></option><?php endwhile;$stmt->close(); ?></select></div><div class="form-group"><label for="komentar">Catatan Revisi</label><textarea id="komentar" name="komentar" placeholder="Jelaskan bagian yang perlu diperbaiki dan arah perbaikannya." required></textarea></div><div class="form-group"><label for="tipe_revisi">Tingkat Revisi</label><select id="tipe_revisi" name="tipe_revisi" required><option value="minor">Minor — perbaikan kecil</option><option value="major">Major — perubahan signifikan</option><option value="kritis">Kritis — perubahan mendesak</option></select></div><button type="submit" class="btn btn-primary">Kirim Revisi</button></form></section>
+<?php endif; ?>
