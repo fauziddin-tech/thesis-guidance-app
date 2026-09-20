@@ -360,7 +360,10 @@ if($user){
     $sNav=$conn->prepare('SELECT COUNT(*) total FROM notifikasi WHERE user_id=? AND dibaca=0');
     if($sNav){$sNav->bind_param('i',$uidNav);$sNav->execute();$unreadNotificationCount=(int)($sNav->get_result()->fetch_assoc()['total']??0);$sNav->close();}
 }
-$assetVersion='20260918';
+$assetFiles=[__DIR__.'/public/css/style.css',__DIR__.'/public/js/script.js',__DIR__.'/logo.png'];
+$assetVersion='';
+foreach($assetFiles as $assetFile){ if(is_file($assetFile)) $assetVersion.=(string)filemtime($assetFile).filesize($assetFile); }
+$assetVersion=$assetVersion!==''?substr(md5($assetVersion),0,10):'20260919';
 $flash=take_flash();
 ?>
 <!doctype html>
