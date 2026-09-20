@@ -33,15 +33,15 @@ if (!function_exists('render_pagination')) {
         ?>
         <div class="account-pagination">
           <div class="account-pagination-info">Menampilkan <?=e($total ? $offset+1 : 0)?>–<?=e(min($offset+$limit,$total))?> dari <?=e($total)?> <?=e($label)?></div>
-          <div class="account-pagination-controls">
-            <?php if($page>1): ?><a class="account-page-link" href="<?=e($buildUrl($page-1))?>">‹ Sebelumnya</a><?php else: ?><span class="account-page-link disabled">‹ Sebelumnya</span><?php endif; ?>
+          <nav class="account-pagination-controls" aria-label="Navigasi halaman">
+            <?php if($page>1): ?><a class="account-page-link" href="<?=e($buildUrl($page-1))?>">‹ Sebelumnya</a><?php else: ?><span class="account-page-link disabled" aria-disabled="true">‹ Sebelumnya</span><?php endif; ?>
             <?php $previousPage=0; foreach($pageNumbers as $p): ?>
               <?php if($previousPage && $p>$previousPage+1): ?><span class="account-page-ellipsis">…</span><?php endif; ?>
               <?php if($p===$page): ?><span class="account-page-link active" aria-current="page"><?=$p?></span><?php else: ?><a class="account-page-link" href="<?=e($buildUrl($p))?>"><?=$p?></a><?php endif; ?>
               <?php $previousPage=$p; ?>
             <?php endforeach; ?>
-            <?php if($page<$totalPages): ?><a class="account-page-link" href="<?=e($buildUrl($page+1))?>">Berikutnya ›</a><?php else: ?><span class="account-page-link disabled">Berikutnya ›</span><?php endif; ?>
-          </div>
+            <?php if($page<$totalPages): ?><a class="account-page-link" href="<?=e($buildUrl($page+1))?>">Berikutnya ›</a><?php else: ?><span class="account-page-link disabled" aria-disabled="true">Berikutnya ›</span><?php endif; ?>
+          </nav>
         </div>
         <?php
         return (string)ob_get_clean();

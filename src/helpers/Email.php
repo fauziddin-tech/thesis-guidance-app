@@ -76,17 +76,17 @@ function send_user_email(mysqli $conn, int $userId, string $subject, string $tit
             $base = rtrim((defined('APP_URL') && APP_URL !== '') ? APP_URL : (getenv('APP_URL') ?: 'https://mythesis.my.id'), '/');
             if ($base !== '') $url = $base . '/' . ltrim($url, '/');
         }
-        $button = '<p style="margin:24px 0"><a href="' . email_escape($url) . '" style="display:inline-block;padding:10px 16px;background:#315d82;color:#fff;text-decoration:none;border-radius:5px;font-weight:700">' . email_escape($buttonText ?: 'Buka MyThesis') . '</a></p>';
+        $button = '<p style="margin:24px 0"><a href="' . email_escape($url) . '" style="display:inline-block;padding:10px 16px;background:#52658F;color:#fff;text-decoration:none;border-radius:5px;font-weight:700">' . email_escape($buttonText ?: 'Buka MyThesis') . '</a></p>';
     }
 
-    $html = '<!doctype html><html lang="id"><body style="margin:0;padding:24px;background:#f5f7f9;font-family:Arial,Segoe UI,sans-serif;color:#263541">'
-          . '<div style="max-width:640px;margin:auto;background:#fff;border:1px solid #dfe5ea;border-radius:8px;padding:28px">'
-          . '<div style="font-size:20px;font-weight:700;color:#162536;margin-bottom:22px">MyThesis</div>'
+    $html = '<!doctype html><html lang="id"><body style="margin:0;padding:24px;background:#F7F5E6;font-family:Arial,Segoe UI,sans-serif;color:#282D43">'
+          . '<div style="max-width:640px;margin:auto;background:#fff;border:1px solid #E8E8E8;border-radius:8px;padding:28px">'
+          . '<div style="font-size:20px;font-weight:700;color:#282D43;margin-bottom:22px">MyThesis</div>'
           . '<p>Halo ' . $name . ',</p>'
           . '<h2 style="font-size:21px;margin:16px 0 10px">' . $safeTitle . '</h2>'
           . '<p style="line-height:1.6">' . $safeMessage . '</p>'
           . $button
-          . '<p style="font-size:12px;color:#71808e;border-top:1px solid #e2e7eb;padding-top:18px;margin-top:26px">Email ini dikirim otomatis oleh MyThesis. Jika Anda tidak melakukan aktivitas tersebut, silakan hubungi administrator.</p>'
+          . '<p style="font-size:12px;color:#52658F;border-top:1px solid #E8E8E8;padding-top:18px;margin-top:26px">Email ini dikirim otomatis oleh MyThesis. Jika Anda tidak melakukan aktivitas tersebut, silakan hubungi administrator.</p>'
           . '</div></body></html>';
 
     return send_resend_email($user['email'], $subject, $html);
