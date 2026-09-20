@@ -1,97 +1,11 @@
-<div class="card" style="max-width: 600px; margin: 30px auto;">
-    <h2>Daftar Akun</h2>
-    
-    <?php
-    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-        $username = $_POST['username'] ?? '';
-        $email = $_POST['email'] ?? '';
-        $nama_lengkap = $_POST['nama_lengkap'] ?? '';
-        $password = $_POST['password'] ?? '';
-        $confirm_password = $_POST['confirm_password'] ?? '';
-        $role = $_POST['role'] ?? 'mahasiswa';
-        $no_telp = $_POST['no_telp'] ?? '';
-        
-        // Validasi
-        if (empty($username) || empty($email) || empty($nama_lengkap) || empty($password)) {
-            echo '<div class="alert alert-danger">Semua field harus diisi!</div>';
-        } elseif ($password !== $confirm_password) {
-            echo '<div class="alert alert-danger">Password tidak cocok!</div>';
-        } elseif (strlen($password) < 6) {
-            echo '<div class="alert alert-danger">Password minimal 6 karakter!</div>';
-        } else {
-            // Cek apakah username sudah terdaftar
-            $query = "SELECT id FROM users WHERE username = ? OR email = ?";
-            $stmt = $conn->prepare($query);
-            $stmt->bind_param('ss', $username, $email);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            
-            if ($result->num_rows > 0) {
-                echo '<div class="alert alert-danger">Username atau email sudah terdaftar!</div>';
-            } else {
-                // Hash password
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                
-                // Insert user baru
-                $query = "INSERT INTO users (username, email, password, role, nama_lengkap, no_telp) 
-                         VALUES (?, ?, ?, ?, ?, ?)";
-                $stmt = $conn->prepare($query);
-                $stmt->bind_param('ssssss', $username, $email, $hashed_password, $role, $nama_lengkap, $no_telp);
-                
-                if ($stmt->execute()) {
-                    echo '<div class="alert alert-success">Pendaftaran berhasil! <a href="?page=login">Login di sini</a></div>';
-                } else {
-                    echo '<div class="alert alert-danger">Gagal mendaftar! Error: ' . $stmt->error . '</div>';
-                }
-            }
-            $stmt->close();
-        }
-    }
-    ?>
-    
-    <form method="POST">
-        <div class="form-group">
-            <label for="nama_lengkap">Nama Lengkap</label>
-            <input type="text" id="nama_lengkap" name="nama_lengkap" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" name="username" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="no_telp">No. Telepon</label>
-            <input type="text" id="no_telp" name="no_telp">
-        </div>
-        
-        <div class="form-group">
-            <label for="role">Pilih Role</label>
-            <select id="role" name="role" required>
-                <option value="mahasiswa">Mahasiswa</option>
-                <option value="dosen">Dosen</option>
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        
-        <div class="form-group">
-            <label for="confirm_password">Konfirmasi Password</label>
-            <input type="password" id="confirm_password" name="confirm_password" required>
-        </div>
-        
-        <button type="submit" class="btn btn-success" style="width: 100%;">Daftar</button>
-    </form>
-    
-    <p style="margin-top: 20px; text-align: center;">
-        Sudah punya akun? <a href="?page=login">Login di sini</a>
-    </p>
-</div>
+<?php
+$registerMessage='';$registerType='danger';
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    $username=trim($_POST['username']??'');$email=trim($_POST['email']??'');$nama=trim($_POST['nama_lengkap']??'');$password=$_POST['password']??'';$confirm=$_POST['confirm_password']??'';$role=$_POST['role']??'mahasiswa';$telp=trim($_POST['no_telp']??'');
+    if($username===''||!filter_var($email,FILTER_VALIDATE_EMAIL)||$nama===''||strlen($password)<8){$registerMessage='Lengkapi data dengan benar. Password minimal 8 karakter.';}
+    elseif($password!==$confirm){$registerMessage='Konfirmasi password tidak sama.';}
+    elseif(!in_array($role,['mahasiswa','dosen'],true)){$registerMessage='Peran akun tidak valid.';}
+    else{$stmt=$conn->prepare('SELECT id FROM users WHERE username=? OR email=? LIMIT 1');$stmt->bind_param('ss',$username,$email);$stmt->execute();$exists=$stmt->get_result()->num_rows>0;$stmt->close();if($exists){$registerMessage='Username atau email sudah terdaftar.';}else{$hash=password_hash($password,PASSWORD_DEFAULT);$stmt=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp) VALUES(?,?,?,?,?,?)');$stmt->bind_param('ssssss',$username,$email,$hash,$role,$nama,$telp);$ok=$stmt->execute();$stmt->close();$registerMessage=$ok?'Pendaftaran berhasil. Silakan masuk menggunakan akun Anda.':'Pendaftaran belum berhasil. Silakan coba kembali.';$registerType=$ok?'success':'danger';}}
+}
+?>
+<div class="auth-card auth-card-wide card"><span class="eyebrow">PENDAFTARAN PENGGUNA</span><h1>Buat akun MyThesis</h1><p>Lengkapi data berikut untuk memulai proses bimbingan skripsi.</p><?php if($registerMessage!==''): ?><div class="alert alert-<?=$registerType?>" role="alert"><?=htmlspecialchars($registerMessage,ENT_QUOTES,'UTF-8')?><?php if($registerType==='success'): ?> <a href="?page=login">Masuk sekarang</a><?php endif; ?></div><?php endif; ?><form method="post"><fieldset><legend>Data diri</legend><div class="form-grid"><div class="form-group"><label for="nama_lengkap">Nama Lengkap</label><input id="nama_lengkap" name="nama_lengkap" autocomplete="name" required maxlength="150"></div><div class="form-group"><label for="no_telp">No. Telepon</label><input id="no_telp" name="no_telp" type="tel" autocomplete="tel" maxlength="20" placeholder="Contoh: 081234567890"></div></div></fieldset><fieldset><legend>Informasi akun</legend><div class="form-grid"><div class="form-group"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required maxlength="100"></div><div class="form-group"><label for="email">Email aktif</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="100"></div></div><div class="form-group"><label for="role">Peran</label><select id="role" name="role" required><option value="mahasiswa">Mahasiswa</option><option value="dosen">Dosen</option></select></div></fieldset><fieldset><legend>Keamanan akun</legend><div class="form-grid"><div class="form-group"><label for="register_password">Password</label><div class="password-field"><input id="register_password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required><button type="button" data-password-toggle aria-controls="register_password">Lihat</button></div><small class="field-help">Minimal 8 karakter.</small></div><div class="form-group"><label for="confirm_password">Konfirmasi Password</label><div class="password-field"><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required><button type="button" data-password-toggle aria-controls="confirm_password">Lihat</button></div></div></div></fieldset><button class="btn btn-primary btn-block" type="submit">Buat Akun</button></form><p class="auth-switch">Sudah punya akun? <a href="?page=login">Masuk ke MyThesis</a></p></div>

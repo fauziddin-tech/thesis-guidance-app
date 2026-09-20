@@ -1,40 +1,4 @@
-<div class="card">
-    <h2>Selamat Datang di Aplikasi Bimbingan Skripsi</h2>
-    <p>Aplikasi ini dirancang untuk memudahkan proses bimbingan skripsi dengan fitur-fitur lengkap yang komprehensif.</p>
-    
-    <div style="margin-top: 30px;">
-        <h3>Fitur Utama</h3>
-        <ul style="margin-left: 20px; margin-top: 15px;">
-            <li><strong>Upload Bab Skripsi</strong> - Unggah file bab skripsi dengan mudah untuk diproses</li>
-            <li><strong>Konsultasi Online</strong> - Konsultasikan masalah skripsi dengan dosen pembimbing secara langsung</li>
-            <li><strong>Sistem Revisi</strong> - Dapatkan feedback dan revisi terperinci dari dosen pembimbing</li>
-            <li><strong>Penjadwalan Seminar</strong> - Atur jadwal seminar proposal, hasil, dan sidang dengan mudah</li>
-            <li><strong>Dashboard Monitoring</strong> - Monitor progres skripsi secara real-time</li>
-            <li><strong>Sistem Notifikasi</strong> - Dapatkan notifikasi untuk setiap update penting</li>
-        </ul>
-    </div>
-    
-    <div style="margin-top: 30px; text-align: center;">
-        <?php if (!isset($_SESSION['user'])): ?>
-            <a href="?page=login" class="btn btn-primary">Login</a>
-            <a href="?page=register" class="btn btn-success" style="margin-left: 10px;">Daftar</a>
-        <?php else: ?>
-            <a href="?page=dashboard" class="btn btn-primary">Ke Dashboard</a>
-        <?php endif; ?>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Panduan Penggunaan</h2>
-    <p>Berikut adalah langkah-langkah menggunakan aplikasi ini:</p>
-    
-    <ol style="margin-left: 20px; margin-top: 15px;">
-        <li><strong>Daftar Akun</strong> - Buat akun baru sebagai mahasiswa atau dosen</li>
-        <li><strong>Login</strong> - Masuk dengan username dan password Anda</li>
-        <li><strong>Buat Bimbingan</strong> - Mahasiswa membuat data bimbingan skripsi baru</li>
-        <li><strong>Upload Bab</strong> - Unggah file bab skripsi untuk di-review oleh dosen</li>
-        <li><strong>Terima Feedback</strong> - Dosen memberikan revisi dan komentar terperinci</li>
-        <li><strong>Jadwalkan Seminar</strong> - Atur jadwal seminar dengan dosen dan penguji</li>
-        <li><strong>Selesaikan Bimbingan</strong> - Tandai bimbingan sebagai selesai setelah semua tahap terpenuhi</li>
-    </ol>
-</div>
+<section class="hero"><div class="hero-copy"><span class="eyebrow">PLATFORM BIMBINGAN SKRIPSI</span><h1>Selesaikan skripsi dengan alur yang lebih jelas.</h1><p>MyThesis menyatukan dokumen, catatan revisi, dan pemantauan progres dalam satu ruang kerja akademik untuk mahasiswa dan dosen.</p><div class="actions"><?php if(!isset($_SESSION['user'])): ?><a href="?page=register" class="btn btn-primary">Mulai sebagai Mahasiswa</a><a href="?page=login" class="btn btn-secondary">Masuk</a><?php else: ?><a href="?page=dashboard" class="btn btn-primary">Buka Dashboard</a><?php endif; ?></div><div class="hero-trust"><span><strong>01</strong> Progres terpantau</span><span><strong>02</strong> Riwayat tersimpan</span><span><strong>03</strong> Dokumen terorganisasi</span></div></div><aside class="hero-panel" aria-label="Alur bimbingan MyThesis"><span class="hero-panel-label">ALUR TERSTRUKTUR</span><ol><li><span>1</span><div><strong>Buat bimbingan</strong><small>Hubungkan mahasiswa dengan dosen pembimbing.</small></div></li><li><span>2</span><div><strong>Unggah per bab</strong><small>Simpan dokumen sesuai tahap penelitian.</small></div></li><li><span>3</span><div><strong>Tindak lanjuti revisi</strong><small>Catatan dosen tersusun pada setiap naskah.</small></div></li><li><span>4</span><div><strong>Pantau penyelesaian</strong><small>Lihat perkembangan secara berkala.</small></div></li></ol></aside></section>
+<section class="section-heading"><span class="eyebrow">FUNGSI UTAMA</span><h2>Satu ruang kerja untuk seluruh proses bimbingan</h2><p>Informasi penting tampil pada waktu yang tepat dan mudah dipahami.</p></section>
+<div class="grid-3"><article class="card feature"><div class="feature-icon">01</div><h2>Dokumen terorganisasi</h2><p>Unggah dokumen bab dalam format yang ditentukan dan temukan kembali dengan mudah.</p></article><article class="card feature"><div class="feature-icon">02</div><h2>Revisi mudah ditelusuri</h2><p>Catatan dosen terhubung dengan bab mahasiswa sehingga arahan tidak tercecer.</p></article><article class="card feature"><div class="feature-icon">03</div><h2>Progres terlihat jelas</h2><p>Status bimbingan membantu pengguna menentukan tindakan berikutnya.</p></article></div>
+<section class="home-roles"><div><span class="eyebrow">UNTUK MAHASISWA</span><h2>Ketahui langkah berikutnya</h2><p>Kelola dokumen dan pantau status bimbingan dari satu halaman.</p></div><div><span class="eyebrow">UNTUK DOSEN</span><h2>Fokus pada naskah prioritas</h2><p>Lihat mahasiswa bimbingan dan berikan catatan secara lebih teratur.</p></div></section>
