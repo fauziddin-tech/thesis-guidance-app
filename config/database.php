@@ -1,6 +1,8 @@
 <?php
-// Gunakan environment variable di server atau salin database.example.php
-// menjadi database.local.php. File lokal tidak boleh diunggah ke GitHub.
+// Mendukung dua format database.local.php:
+// 1. Format lama yang mendefinisikan konstanta DB_HOST, DB_USER, DB_PASS, DB_NAME.
+// 2. Format array dengan kunci host, user, pass, name.
+// File lokal tidak boleh diunggah ke GitHub.
 $localConfig = [];
 $localConfigPath = __DIR__ . '/database.local.php';
 if (is_file($localConfigPath)) {
@@ -8,10 +10,10 @@ if (is_file($localConfigPath)) {
     if (is_array($loadedConfig)) $localConfig = $loadedConfig;
 }
 
-$dbHost = getenv('DB_HOST') ?: ($localConfig['host'] ?? '');
-$dbUser = getenv('DB_USER') ?: ($localConfig['user'] ?? '');
-$dbPass = getenv('DB_PASS') ?: ($localConfig['pass'] ?? '');
-$dbName = getenv('DB_NAME') ?: ($localConfig['name'] ?? '');
+$dbHost = getenv('DB_HOST') ?: (defined('DB_HOST') ? DB_HOST : ($localConfig['host'] ?? ''));
+$dbUser = getenv('DB_USER') ?: (defined('DB_USER') ? DB_USER : ($localConfig['user'] ?? ''));
+$dbPass = getenv('DB_PASS') ?: (defined('DB_PASS') ? DB_PASS : ($localConfig['pass'] ?? ''));
+$dbName = getenv('DB_NAME') ?: (defined('DB_NAME') ? DB_NAME : ($localConfig['name'] ?? ''));
 
 if ($dbHost === '' || $dbUser === '' || $dbName === '') {
     error_log('Konfigurasi database MyThesis belum lengkap.');

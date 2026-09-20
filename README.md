@@ -31,3 +31,5 @@ MyThesis adalah aplikasi bimbingan skripsi berbasis PHP dan MySQL untuk mengelol
 6. Buka aplikasi dan daftarkan akun mahasiswa. Akun dosen harus dibuat oleh administrator.
 
 Jangan mengunggah `config/database.local.php`, file log, atau dokumen pengguna ke GitHub. Lihat `INSTALASI.md` untuk panduan cPanel dan `DEPLOYMENT.md` untuk pembaruan melalui terminal.
+
+Konfigurasi lokal lama yang menggunakan konstanta `DB_HOST`, `DB_USER`, `DB_PASS`, dan `DB_NAME` tetap didukung untuk memudahkan upgrade.
