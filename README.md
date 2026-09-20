@@ -1,39 +1,33 @@
-# Aplikasi Bimbingan Skripsi
+# MyThesis
 
-Aplikasi web untuk memudahkan proses bimbingan skripsi dengan fitur:
-- Konsultasi online
-- Upload bab skripsi
-- Revisi dan feedback
-- Penjadwalan seminar
+MyThesis adalah aplikasi bimbingan skripsi berbasis PHP dan MySQL untuk mengelola dokumen, review dosen, revisi, dan progres mahasiswa dalam satu ruang kerja.
 
-## Teknologi
-- Frontend: HTML, CSS, JavaScript
-- Backend: PHP
-- Database: MySQL
+## Fitur
 
-## Instalasi di cPanel
+- Dashboard terpisah untuk mahasiswa dan dosen
+- Dashboard administrator untuk membuat akun dosen dan relasi bimbingan
+- Unggah dokumen PDF, DOC, dan DOCX dengan versioning otomatis
+- Antrean review, catatan revisi, dan persetujuan dokumen
+- Unduhan dokumen dengan pemeriksaan hak akses
+- Notifikasi aktivitas pada basis data
+- Tema terang/gelap dan tampilan responsif
+- Perlindungan CSRF dan validasi unggahan
+- Kredensial basis data disimpan di luar Git
 
-1. Download semua file
-2. Extract di direktori public_html
-3. Buat database MySQL melalui cPanel
-4. Update konfigurasi di `config/database.php`
-5. Jalankan `schema.sql` untuk membuat tabel
-6. Akses melalui browser: http://yourdomain.com
+## Persyaratan
 
-## Struktur Folder
-```
-thesis-guidance-app/
-├── config/
-│   └── database.php
-├── public/
-│   ├── css/
-│   ├── js/
-│   └── uploads/
-├── src/
-│   ├── controllers/
-│   ├── models/
-│   └── views/
-├── schema.sql
-└── index.php
-```
-# Test deployment
+- PHP 7.4 atau lebih baru
+- MySQL 5.7 atau MariaDB yang setara
+- Ekstensi PHP: `mysqli`, `fileinfo`, dan `mbstring`
+- Apache dengan `mod_rewrite`
+
+## Instalasi ringkas
+
+1. Salin aplikasi ke server.
+2. Import `schema.sql` melalui phpMyAdmin.
+3. Salin `config/database.example.php` menjadi `config/database.local.php`.
+4. Isi koneksi basis data pada file lokal tersebut.
+5. Pastikan `storage/uploads` dapat ditulis oleh PHP, umumnya permission `750` atau `755`.
+6. Buka aplikasi dan daftarkan akun mahasiswa. Akun dosen harus dibuat oleh administrator.
+
+Jangan mengunggah `config/database.local.php`, file log, atau dokumen pengguna ke GitHub. Lihat `INSTALASI.md` untuk panduan cPanel dan `DEPLOYMENT.md` untuk pembaruan melalui terminal.
