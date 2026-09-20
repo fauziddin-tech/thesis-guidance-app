@@ -1,30 +1,184 @@
 <?php
-$user=$_SESSION['user'];$userId=(int)$user['id'];$role=(string)$user['role'];
-$statusBadge=function(string $status): string{$class=in_array($status,['aktif','selesai','disetujui'],true)?'success':(in_array($status,['direvisi','pending'],true)?'warning':'secondary');return '<span class="badge badge-'.$class.'">'.htmlspecialchars(ucfirst(str_replace('_',' ',$status)),ENT_QUOTES,'UTF-8').'</span>';};
-?>
-<div class="page-head"><div><span class="eyebrow">RUANG KERJA <?=htmlspecialchars(strtoupper($role),ENT_QUOTES,'UTF-8')?></span><h1>Selamat datang, <?=htmlspecialchars($user['nama_lengkap'],ENT_QUOTES,'UTF-8')?>.</h1><p><?= $role==='mahasiswa'?'Pantau bimbingan dan kelola dokumen skripsi Anda.':'Tinjau mahasiswa bimbingan dan berikan arahan secara teratur.' ?></p></div><span class="role-badge"><?=htmlspecialchars(ucfirst($role),ENT_QUOTES,'UTF-8')?></span></div>
+$user = $_SESSION['user'];
+$userId = (int)$user['id'];
+$role = (string)$user['role'];
 
-<nav class="quick-actions" aria-label="Akses cepat dashboard">
-<?php if($role==='mahasiswa'): ?><a href="#bimbingan-saya"><span>01</span><div><strong>Lihat bimbingan</strong><small>Pantau judul, dosen, dan status</small></div></a><a href="#unggah-bab"><span>02</span><div><strong>Unggah naskah</strong><small>Kirim dokumen bab terbaru</small></div></a><?php elseif($role==='dosen'): ?><a href="#mahasiswa-bimbingan"><span>01</span><div><strong>Lihat mahasiswa</strong><small>Pantau bimbingan aktif</small></div></a><a href="#berikan-revisi"><span>02</span><div><strong>Berikan revisi</strong><small>Tulis arahan untuk dokumen</small></div></a><?php endif; ?>
-</nav>
+$statusBadge = function (string $status): string {
+    $success = ['aktif', 'selesai', 'disetujui', 'diterima'];
+    $warning = ['direvisi', 'pending', 'menunggu_review', 'terjadwal'];
+    $class = in_array($status, $success, true) ? 'success' : (in_array($status, $warning, true) ? 'warning' : 'secondary');
+    $label = ['menunggu_review' => 'Menunggu review', 'direvisi' => 'Perlu revisi'][$status] ?? ucfirst(str_replace('_', ' ', $status));
+    return '<span class="badge badge-' . $class . '">' . h($label) . '</span>';
+};
+
+$redirectDashboard = function (string $anchor = ''): void {
+    header('Location: ?page=dashboard' . ($anchor !== '' ? '#' . $anchor : ''));
+    exit;
+};
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!verify_csrf()) {
+        set_flash('danger', 'Sesi formulir telah berakhir. Muat ulang halaman dan coba kembali.');
+        $redirectDashboard();
+    }
+
+    $action = isset($_POST['action']) ? (string)$_POST['action'] : '';
+
+    if ($action === 'upload_chapter' && $role === 'mahasiswa') {
+        $guidanceId = filter_input(INPUT_POST, 'bimbingan_id', FILTER_VALIDATE_INT);
+        $chapterName = trim((string)($_POST['nama_bab'] ?? ''));
+        $file = $_FILES['file_bab'] ?? null;
+        $stmt = $conn->prepare("SELECT id,dosen_id FROM bimbingan WHERE id=? AND mahasiswa_id=? AND status='aktif' LIMIT 1");
+        $stmt->bind_param('ii', $guidanceId, $userId);$stmt->execute();$guidance = $stmt->get_result()->fetch_assoc();$stmt->close();
+
+        $allowedExtensions = ['pdf', 'doc', 'docx'];
+        $allowedMimes = ['pdf'=>['application/pdf'],'doc'=>['application/msword','application/octet-stream'],'docx'=>['application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/zip','application/octet-stream']];
+        $extension = $file ? strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) : '';
+        $mime = '';
+        if ($file && ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && function_exists('finfo_open')) {
+            $finfo = finfo_open(FILEINFO_MIME_TYPE);
+            if ($finfo) {$mime = (string)finfo_file($finfo, $file['tmp_name']);finfo_close($finfo);}
+        }
+
+        if (!$guidance) set_flash('danger', 'Bimbingan aktif tidak ditemukan.');
+        elseif ($chapterName === '' || mb_strlen($chapterName) > 100) set_flash('danger', 'Nama bab wajib diisi dan maksimal 100 karakter.');
+        elseif (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) set_flash('danger', 'File gagal diterima. Pilih kembali dokumen Anda.');
+        elseif (($file['size'] ?? 0) < 1 || $file['size'] > 10 * 1024 * 1024) set_flash('danger', 'Ukuran file harus antara 1 byte dan 10 MB.');
+        elseif (!in_array($extension, $allowedExtensions, true) || ($mime !== '' && !in_array($mime, $allowedMimes[$extension], true))) set_flash('danger', 'Format file tidak valid. Gunakan PDF, DOC, atau DOCX.');
+        else {
+            $uploadDirectory = __DIR__ . '/../../storage/uploads';
+            if (!is_dir($uploadDirectory)) mkdir($uploadDirectory, 0750, true);
+            $storedName = bin2hex(random_bytes(20)) . '.' . $extension;
+            $absolutePath = $uploadDirectory . '/' . $storedName;
+            $relativePath = 'storage/uploads/' . $storedName;
+            if (!move_uploaded_file($file['tmp_name'], $absolutePath)) set_flash('danger', 'Dokumen belum dapat disimpan. Periksa izin folder penyimpanan.');
+            else {
+                $stmt = $conn->prepare('SELECT COALESCE(MAX(versi),0)+1 AS next_version FROM bab_skripsi WHERE bimbingan_id=? AND nama_bab=?');
+                $stmt->bind_param('is', $guidanceId, $chapterName);$stmt->execute();$version = (int)$stmt->get_result()->fetch_assoc()['next_version'];$stmt->close();
+                $stmt = $conn->prepare("INSERT INTO bab_skripsi(bimbingan_id,nama_bab,file_path,versi,status) VALUES(?,?,?,?,'menunggu_review')");
+                $stmt->bind_param('issi', $guidanceId, $chapterName, $relativePath, $version);$saved = $stmt->execute();$stmt->close();
+                if (!$saved) {unlink($absolutePath);set_flash('danger', 'Data dokumen belum dapat disimpan. Silakan coba kembali.');}
+                else {
+                    $message = $user['nama_lengkap'] . ' mengunggah ' . $chapterName . ' versi ' . $version . '.';$link = '?page=dashboard#dokumen-mahasiswa';
+                    $recipientId = (int)$guidance['dosen_id'];
+                    $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'unggah_bab',?,?)");
+                    $stmt->bind_param('iss', $recipientId, $message, $link);$stmt->execute();$stmt->close();
+                    set_flash('success', 'Dokumen berhasil diunggah dan dosen pembimbing telah diberi notifikasi.');
+                }
+            }
+        }
+        $redirectDashboard('dokumen-saya');
+    }
+
+    if (($action === 'add_revision' || $action === 'approve_document') && $role === 'dosen') {
+        $chapterId = filter_input(INPUT_POST, 'bab_id', FILTER_VALIDATE_INT);
+        $stmt = $conn->prepare('SELECT bs.id,bs.nama_bab,b.mahasiswa_id FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE bs.id=? AND b.dosen_id=? LIMIT 1');
+        $stmt->bind_param('ii', $chapterId, $userId);$stmt->execute();$chapter = $stmt->get_result()->fetch_assoc();$stmt->close();
+        if (!$chapter) set_flash('danger', 'Dokumen tidak ditemukan atau bukan bagian dari bimbingan Anda.');
+        elseif ($action === 'approve_document') {
+            $stmt = $conn->prepare("UPDATE bab_skripsi SET status='disetujui' WHERE id=?");$stmt->bind_param('i', $chapterId);$ok = $stmt->execute();$stmt->close();
+            if ($ok) {
+                $message = $chapter['nama_bab'] . ' telah disetujui oleh dosen pembimbing.';$link = '?page=dashboard#dokumen-saya';
+                $recipientId = (int)$chapter['mahasiswa_id'];
+                $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'persetujuan',?,?)");$stmt->bind_param('iss', $recipientId, $message, $link);$stmt->execute();$stmt->close();
+                set_flash('success', 'Dokumen berhasil disetujui.');
+            } else set_flash('danger', 'Status dokumen belum dapat diperbarui.');
+        } else {
+            $comment = trim((string)($_POST['komentar'] ?? ''));$revisionType = (string)($_POST['tipe_revisi'] ?? 'minor');
+            if (mb_strlen($comment) < 10 || mb_strlen($comment) > 5000) set_flash('danger', 'Catatan revisi minimal 10 dan maksimal 5.000 karakter.');
+            elseif (!in_array($revisionType, ['minor', 'major', 'kritis'], true)) set_flash('danger', 'Tingkat revisi tidak valid.');
+            else {
+                $conn->begin_transaction();
+                $stmt = $conn->prepare('INSERT INTO revisi(bab_id,dosen_id,komentar,tipe_revisi) VALUES(?,?,?,?)');$stmt->bind_param('iiss', $chapterId, $userId, $comment, $revisionType);$ok = $stmt->execute();$stmt->close();
+                if ($ok) {$stmt = $conn->prepare("UPDATE bab_skripsi SET status='direvisi' WHERE id=?");$stmt->bind_param('i', $chapterId);$ok = $stmt->execute();$stmt->close();}
+                if ($ok) $conn->commit(); else $conn->rollback();
+                if ($ok) {
+                    $message = 'Catatan revisi baru diberikan untuk ' . $chapter['nama_bab'] . '.';$link = '?page=dashboard#dokumen-saya';
+                    $recipientId = (int)$chapter['mahasiswa_id'];
+                    $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'revisi',?,?)");$stmt->bind_param('iss', $recipientId, $message, $link);$stmt->execute();$stmt->close();
+                    set_flash('success', 'Catatan revisi berhasil dikirim kepada mahasiswa.');
+                } else set_flash('danger', 'Catatan revisi belum dapat disimpan.');
+            }
+        }
+        $redirectDashboard('dokumen-mahasiswa');
+    }
+
+    if ($action === 'create_lecturer' && $role === 'admin') {
+        $name = trim((string)($_POST['nama_lengkap'] ?? ''));
+        $username = trim((string)($_POST['username'] ?? ''));
+        $email = trim((string)($_POST['email'] ?? ''));
+        $password = (string)($_POST['password'] ?? '');
+        if ($name === '' || !preg_match('/^[A-Za-z0-9._-]{4,100}$/', $username) || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 8) {
+            set_flash('danger', 'Data dosen belum lengkap atau belum memenuhi ketentuan.');
+        } else {
+            $stmt = $conn->prepare('SELECT id FROM users WHERE username=? OR email=? LIMIT 1');$stmt->bind_param('ss', $username, $email);$stmt->execute();$exists = $stmt->get_result()->num_rows > 0;$stmt->close();
+            if ($exists) set_flash('danger', 'Username atau email dosen sudah digunakan.');
+            else {
+                $hash = password_hash($password, PASSWORD_DEFAULT);$lecturerRole = 'dosen';$phone = '';
+                $stmt = $conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp) VALUES(?,?,?,?,?,?)');$stmt->bind_param('ssssss', $username, $email, $hash, $lecturerRole, $name, $phone);$ok = $stmt->execute();$stmt->close();
+                set_flash($ok ? 'success' : 'danger', $ok ? 'Akun dosen berhasil dibuat.' : 'Akun dosen belum dapat dibuat.');
+            }
+        }
+        $redirectDashboard('kelola-dosen');
+    }
+
+    if ($action === 'create_guidance' && $role === 'admin') {
+        $studentId = filter_input(INPUT_POST, 'mahasiswa_id', FILTER_VALIDATE_INT);
+        $lecturerId = filter_input(INPUT_POST, 'dosen_id', FILTER_VALIDATE_INT);
+        $title = trim((string)($_POST['judul_skripsi'] ?? ''));
+        $description = trim((string)($_POST['deskripsi'] ?? ''));
+        $stmt = $conn->prepare("SELECT SUM(role='mahasiswa' AND id=?) AS student_ok,SUM(role='dosen' AND id=?) AS lecturer_ok FROM users WHERE id IN (?,?)");
+        $stmt->bind_param('iiii', $studentId, $lecturerId, $studentId, $lecturerId);$stmt->execute();$validUsers = $stmt->get_result()->fetch_assoc();$stmt->close();
+        if (!$validUsers || !(int)$validUsers['student_ok'] || !(int)$validUsers['lecturer_ok'] || $title === '' || mb_strlen($title) > 255) {
+            set_flash('danger', 'Mahasiswa, dosen, atau judul skripsi tidak valid.');
+        } else {
+            $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,judul_skripsi,deskripsi,status) VALUES(?,?,?,?,'aktif')");$stmt->bind_param('iiss', $studentId, $lecturerId, $title, $description);$ok = $stmt->execute();$stmt->close();
+            if ($ok) {
+                $message = 'Bimbingan baru untuk judul: ' . $title . '.';$link = '?page=dashboard#bimbingan-saya';
+                $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'bimbingan_baru',?,?)");$stmt->bind_param('iss', $studentId, $message, $link);$stmt->execute();$stmt->close();
+                set_flash('success', 'Relasi bimbingan berhasil dibuat.');
+            } else set_flash('danger', 'Relasi bimbingan belum dapat dibuat.');
+        }
+        $redirectDashboard('kelola-bimbingan');
+    }
+    set_flash('danger', 'Tindakan tidak dikenali atau tidak diizinkan.');$redirectDashboard();
+}
+
+$flash = pull_flash();$guidances = [];$documents = [];$students = [];$lecturers = [];
+if ($role === 'mahasiswa') {
+    $stmt = $conn->prepare('SELECT b.*,u.nama_lengkap AS dosen_nama FROM bimbingan b JOIN users u ON b.dosen_id=u.id WHERE b.mahasiswa_id=? ORDER BY b.created_at DESC');$stmt->bind_param('i', $userId);$stmt->execute();$guidances = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+    $stmt = $conn->prepare('SELECT bs.*,b.judul_skripsi,(SELECT r.komentar FROM revisi r WHERE r.bab_id=bs.id ORDER BY r.created_at DESC LIMIT 1) AS komentar_terakhir,(SELECT r.tipe_revisi FROM revisi r WHERE r.bab_id=bs.id ORDER BY r.created_at DESC LIMIT 1) AS tipe_terakhir FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE b.mahasiswa_id=? ORDER BY bs.uploaded_at DESC');$stmt->bind_param('i', $userId);$stmt->execute();$documents = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+} elseif ($role === 'dosen') {
+    $stmt = $conn->prepare('SELECT b.*,u.nama_lengkap,u.email FROM bimbingan b JOIN users u ON b.mahasiswa_id=u.id WHERE b.dosen_id=? ORDER BY b.created_at DESC');$stmt->bind_param('i', $userId);$stmt->execute();$guidances = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+    $stmt = $conn->prepare("SELECT bs.*,b.judul_skripsi,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id JOIN users u ON b.mahasiswa_id=u.id WHERE b.dosen_id=? ORDER BY FIELD(bs.status,'menunggu_review','direvisi','draft','disetujui'),bs.uploaded_at DESC");$stmt->bind_param('i', $userId);$stmt->execute();$documents = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+} elseif ($role === 'admin') {
+    $students = $conn->query("SELECT id,nama_lengkap,email FROM users WHERE role='mahasiswa' ORDER BY nama_lengkap")->fetch_all(MYSQLI_ASSOC);
+    $lecturers = $conn->query("SELECT id,nama_lengkap,email FROM users WHERE role='dosen' ORDER BY nama_lengkap")->fetch_all(MYSQLI_ASSOC);
+    $guidances = $conn->query('SELECT b.*,m.nama_lengkap AS mahasiswa_nama,d.nama_lengkap AS dosen_nama FROM bimbingan b JOIN users m ON b.mahasiswa_id=m.id JOIN users d ON b.dosen_id=d.id ORDER BY b.created_at DESC')->fetch_all(MYSQLI_ASSOC);
+}
+$pendingCount = count(array_filter($documents, function ($item) use ($role) {
+    return $role === 'mahasiswa' ? $item['status'] === 'direvisi' : $item['status'] === 'menunggu_review';
+}));
+?>
+<div class="page-head"><div><span class="eyebrow">RUANG KERJA <?=h(strtoupper($role))?></span><h1>Selamat datang, <?=h($user['nama_lengkap'])?>.</h1><p><?=h($role==='mahasiswa'?'Pantau bimbingan dan kelola dokumen skripsi Anda.':($role==='dosen'?'Tinjau dokumen dan berikan arahan secara teratur.':'Kelola akun dosen dan relasi bimbingan dari satu halaman.'))?></p></div><span class="role-badge"><?=h(ucfirst($role))?></span></div>
+<?php if($flash): ?><div class="alert alert-<?=h($flash['type'])?>" role="status" tabindex="-1" data-flash><?=h($flash['message'])?></div><?php endif; ?>
+<?php if($role==='mahasiswa'||$role==='dosen'): ?><section class="stats-grid" aria-label="Ringkasan dashboard"><article><span>Bimbingan</span><strong><?=count($guidances)?></strong><small>Total data bimbingan</small></article><article><span>Dokumen</span><strong><?=count($documents)?></strong><small>Seluruh versi dokumen</small></article><article><span><?=$role==='mahasiswa'?'Perlu ditindaklanjuti':'Antrean review'?></span><strong><?=$pendingCount?></strong><small>Status terbaru dokumen</small></article></section><?php endif; ?>
 
 <?php if($role==='mahasiswa'): ?>
-<section class="card" id="bimbingan-saya"><div class="section-heading"><span class="eyebrow">RINGKASAN</span><h2>Bimbingan Saya</h2><p>Daftar bimbingan dan status terbaru skripsi Anda.</p></div>
-<?php
-$stmt=$conn->prepare('SELECT b.*,u.nama_lengkap AS dosen_nama FROM bimbingan b JOIN users u ON b.dosen_id=u.id WHERE b.mahasiswa_id=? ORDER BY b.created_at DESC');$stmt->bind_param('i',$userId);$stmt->execute();$result=$stmt->get_result();
-if($result->num_rows>0): ?>
-<div class="table-wrap"><table><thead><tr><th>Judul Skripsi</th><th>Dosen Pembimbing</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($row=$result->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($row['judul_skripsi'],ENT_QUOTES,'UTF-8')?></strong></td><td><?=htmlspecialchars($row['dosen_nama'],ENT_QUOTES,'UTF-8')?></td><td><?=$statusBadge($row['status'])?></td><td><a href="#unggah-bab" class="btn btn-secondary btn-small">Kelola Dokumen</a></td></tr><?php endwhile; ?></tbody></table></div>
-<?php else: ?><div class="empty-state"><strong>Belum ada bimbingan.</strong><span>Hubungi administrator atau dosen untuk memulai data bimbingan.</span></div><?php endif;$stmt->close(); ?>
-</section>
-
-<section class="card" id="unggah-bab"><div class="section-heading"><span class="eyebrow">DOKUMEN</span><h2>Unggah Bab Skripsi</h2><p>Pilih bimbingan, tuliskan nama bab, kemudian unggah file PDF, DOC, atau DOCX.</p></div><form method="post" enctype="multipart/form-data"><div class="form-grid"><div class="form-group"><label for="bimbingan_id">Bimbingan</label><select id="bimbingan_id" name="bimbingan_id" required><option value="">Pilih bimbingan</option><?php $stmt=$conn->prepare("SELECT id,judul_skripsi FROM bimbingan WHERE mahasiswa_id=? AND status='aktif'");$stmt->bind_param('i',$userId);$stmt->execute();$active=$stmt->get_result();while($row=$active->fetch_assoc()): ?><option value="<?=(int)$row['id']?>"><?=htmlspecialchars($row['judul_skripsi'],ENT_QUOTES,'UTF-8')?></option><?php endwhile;$stmt->close(); ?></select></div><div class="form-group"><label for="nama_bab">Nama Bab</label><input type="text" id="nama_bab" name="nama_bab" placeholder="Contoh: Bab I - Pendahuluan" required></div></div><div class="form-group"><label for="file_bab">File Skripsi</label><input type="file" id="file_bab" name="file_bab" accept=".pdf,.doc,.docx" required><small class="field-help">Format yang diterima: PDF, DOC, dan DOCX.</small></div><button type="submit" class="btn btn-primary">Unggah Bab</button></form></section>
+<nav class="quick-actions" aria-label="Akses cepat dashboard"><a href="#unggah-bab"><span>01</span><div><strong>Unggah naskah</strong><small>Kirim versi dokumen terbaru</small></div></a><a href="#dokumen-saya"><span>02</span><div><strong>Lihat catatan dosen</strong><small>Tindak lanjuti revisi terbaru</small></div></a></nav>
+<section class="card" id="bimbingan-saya"><div class="section-heading"><span class="eyebrow">RINGKASAN</span><h2>Bimbingan Saya</h2><p>Daftar judul, dosen pembimbing, dan status bimbingan.</p></div><?php if($guidances): ?><div class="table-wrap"><table><thead><tr><th>Judul Skripsi</th><th>Dosen Pembimbing</th><th>Status</th></tr></thead><tbody><?php foreach($guidances as $item): ?><tr><td><strong><?=h($item['judul_skripsi'])?></strong></td><td><?=h($item['dosen_nama'])?></td><td><?=$statusBadge($item['status'])?></td></tr><?php endforeach; ?></tbody></table></div><?php else: ?><div class="empty-state"><strong>Belum ada bimbingan.</strong><span>Hubungi administrator untuk menghubungkan akun Anda dengan dosen pembimbing.</span></div><?php endif; ?></section>
+<section class="card" id="unggah-bab"><div class="section-heading"><span class="eyebrow">DOKUMEN BARU</span><h2>Unggah Bab Skripsi</h2><p>Versi baru dengan nama bab yang sama akan diberi nomor versi secara otomatis.</p></div><form method="post" enctype="multipart/form-data"><?=csrf_field()?><input type="hidden" name="action" value="upload_chapter"><div class="form-grid"><div class="form-group"><label for="bimbingan_id">Bimbingan</label><select id="bimbingan_id" name="bimbingan_id" required><option value="">Pilih bimbingan aktif</option><?php foreach($guidances as $item): if($item['status']!=='aktif')continue; ?><option value="<?=(int)$item['id']?>"><?=h($item['judul_skripsi'])?></option><?php endforeach; ?></select></div><div class="form-group"><label for="nama_bab">Nama Bab</label><input type="text" id="nama_bab" name="nama_bab" maxlength="100" placeholder="Contoh: Bab I - Pendahuluan" required></div></div><div class="form-group"><label for="file_bab">File Skripsi</label><input type="file" id="file_bab" name="file_bab" accept=".pdf,.doc,.docx" required><small class="field-help">PDF, DOC, atau DOCX; maksimal 10 MB.</small></div><button type="submit" class="btn btn-primary" <?=!array_filter($guidances,function($item){return $item['status']==='aktif';})?'disabled':''?>>Unggah dan Kirim untuk Review</button></form></section>
+<section class="card" id="dokumen-saya"><div class="section-heading"><span class="eyebrow">RIWAYAT</span><h2>Dokumen dan Catatan Revisi</h2><p>Semua versi naskah ditampilkan dari unggahan terbaru.</p></div><?php if($documents): ?><div class="document-list"><?php foreach($documents as $document): ?><article class="document-item"><div class="document-main"><div><span class="document-meta"><?=h($document['judul_skripsi'])?></span><h3><?=h($document['nama_bab'])?> <small>v<?=(int)$document['versi']?></small></h3><span class="document-date">Diunggah <?=date('d/m/Y H:i',strtotime($document['uploaded_at']))?></span></div><?=$statusBadge($document['status'])?></div><?php if($document['komentar_terakhir']): ?><div class="revision-note"><strong>Catatan <?=h($document['tipe_terakhir'])?></strong><p><?=nl2br(h($document['komentar_terakhir']))?></p></div><?php endif; ?><div class="document-actions"><a class="btn btn-secondary btn-small" href="?action=download&amp;id=<?=(int)$document['id']?>">Unduh dokumen</a><?php if($document['status']==='direvisi'): ?><a class="btn btn-primary btn-small" href="#unggah-bab">Unggah perbaikan</a><?php endif; ?></div></article><?php endforeach; ?></div><?php else: ?><div class="empty-state"><strong>Belum ada dokumen.</strong><span>Unggah bab pertama untuk memulai proses review.</span></div><?php endif; ?></section>
 
 <?php elseif($role==='dosen'): ?>
-<section class="card" id="mahasiswa-bimbingan"><div class="section-heading"><span class="eyebrow">RINGKASAN</span><h2>Mahasiswa Bimbingan Saya</h2><p>Daftar mahasiswa, judul skripsi, dan status bimbingan terbaru.</p></div>
-<?php $stmt=$conn->prepare('SELECT b.*,u.nama_lengkap,u.email FROM bimbingan b JOIN users u ON b.mahasiswa_id=u.id WHERE b.dosen_id=? ORDER BY b.created_at DESC');$stmt->bind_param('i',$userId);$stmt->execute();$result=$stmt->get_result();if($result->num_rows>0): ?>
-<div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul Skripsi</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php while($row=$result->fetch_assoc()): ?><tr><td><strong><?=htmlspecialchars($row['nama_lengkap'],ENT_QUOTES,'UTF-8')?></strong><small class="table-subtext"><?=htmlspecialchars($row['email'],ENT_QUOTES,'UTF-8')?></small></td><td><?=htmlspecialchars($row['judul_skripsi'],ENT_QUOTES,'UTF-8')?></td><td><?=$statusBadge($row['status'])?></td><td><a href="#berikan-revisi" class="btn btn-secondary btn-small">Beri Revisi</a></td></tr><?php endwhile; ?></tbody></table></div>
-<?php else: ?><div class="empty-state"><strong>Belum ada mahasiswa bimbingan.</strong><span>Data akan tampil setelah mahasiswa ditugaskan kepada Anda.</span></div><?php endif;$stmt->close(); ?>
-</section>
-
-<section class="card" id="berikan-revisi"><div class="section-heading"><span class="eyebrow">TINDAK LANJUT</span><h2>Berikan Revisi</h2><p>Pilih dokumen dan tuliskan catatan yang spesifik serta mudah ditindaklanjuti.</p></div><form method="post"><div class="form-group"><label for="bab_id">Dokumen Bab</label><select id="bab_id" name="bab_id" required><option value="">Pilih dokumen</option><?php $stmt=$conn->prepare('SELECT bs.id,bs.nama_bab,u.nama_lengkap FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id JOIN users u ON b.mahasiswa_id=u.id WHERE b.dosen_id=? ORDER BY bs.uploaded_at DESC');$stmt->bind_param('i',$userId);$stmt->execute();$chapters=$stmt->get_result();while($row=$chapters->fetch_assoc()): ?><option value="<?=(int)$row['id']?>"><?=htmlspecialchars($row['nama_bab'].' — '.$row['nama_lengkap'],ENT_QUOTES,'UTF-8')?></option><?php endwhile;$stmt->close(); ?></select></div><div class="form-group"><label for="komentar">Catatan Revisi</label><textarea id="komentar" name="komentar" placeholder="Jelaskan bagian yang perlu diperbaiki dan arah perbaikannya." required></textarea></div><div class="form-group"><label for="tipe_revisi">Tingkat Revisi</label><select id="tipe_revisi" name="tipe_revisi" required><option value="minor">Minor — perbaikan kecil</option><option value="major">Major — perubahan signifikan</option><option value="kritis">Kritis — perubahan mendesak</option></select></div><button type="submit" class="btn btn-primary">Kirim Revisi</button></form></section>
+<nav class="quick-actions" aria-label="Akses cepat dashboard"><a href="#dokumen-mahasiswa"><span>01</span><div><strong>Buka antrean review</strong><small><?=$pendingCount?> dokumen perlu ditinjau</small></div></a><a href="#berikan-revisi"><span>02</span><div><strong>Tulis catatan revisi</strong><small>Berikan arahan yang terukur</small></div></a></nav>
+<section class="card" id="mahasiswa-bimbingan"><div class="section-heading"><span class="eyebrow">MAHASISWA</span><h2>Mahasiswa Bimbingan Saya</h2><p>Daftar mahasiswa dan status bimbingan terbaru.</p></div><?php if($guidances): ?><div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Judul Skripsi</th><th>Status</th></tr></thead><tbody><?php foreach($guidances as $item): ?><tr><td><strong><?=h($item['nama_lengkap'])?></strong><small class="table-subtext"><?=h($item['email'])?></small></td><td><?=h($item['judul_skripsi'])?></td><td><?=$statusBadge($item['status'])?></td></tr><?php endforeach; ?></tbody></table></div><?php else: ?><div class="empty-state"><strong>Belum ada mahasiswa bimbingan.</strong><span>Data akan tampil setelah mahasiswa ditugaskan kepada Anda.</span></div><?php endif; ?></section>
+<section class="card" id="dokumen-mahasiswa"><div class="section-heading"><span class="eyebrow">ANTREAN REVIEW</span><h2>Dokumen Mahasiswa</h2><p>Dokumen yang menunggu review ditempatkan di urutan paling atas.</p></div><?php if($documents): ?><div class="table-wrap"><table><thead><tr><th>Mahasiswa dan Dokumen</th><th>Unggah</th><th>Status</th><th>Tindakan</th></tr></thead><tbody><?php foreach($documents as $document): ?><tr><td><strong><?=h($document['nama_lengkap'])?></strong><small class="table-subtext"><?=h($document['nama_bab'])?> · versi <?=(int)$document['versi']?></small></td><td><?=date('d/m/Y H:i',strtotime($document['uploaded_at']))?></td><td><?=$statusBadge($document['status'])?></td><td><div class="table-actions"><a class="btn btn-secondary btn-small" href="?action=download&amp;id=<?=(int)$document['id']?>">Unduh</a><a class="btn btn-secondary btn-small" href="#berikan-revisi" data-select-document="<?=(int)$document['id']?>">Revisi</a><?php if($document['status']!=='disetujui'): ?><form method="post" data-confirm="Setujui dokumen ini?"><?=csrf_field()?><input type="hidden" name="action" value="approve_document"><input type="hidden" name="bab_id" value="<?=(int)$document['id']?>"><button class="btn btn-success btn-small" type="submit">Setujui</button></form><?php endif; ?></div></td></tr><?php endforeach; ?></tbody></table></div><?php else: ?><div class="empty-state"><strong>Belum ada dokumen mahasiswa.</strong><span>Dokumen akan tampil setelah mahasiswa mengirimkan bab untuk review.</span></div><?php endif; ?></section>
+<section class="card" id="berikan-revisi"><div class="section-heading"><span class="eyebrow">TINDAK LANJUT</span><h2>Berikan Revisi</h2><p>Tuliskan bagian yang perlu diperbaiki dan arah perbaikannya secara spesifik.</p></div><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="add_revision"><div class="form-group"><label for="bab_id">Dokumen Bab</label><select id="bab_id" name="bab_id" required><option value="">Pilih dokumen</option><?php foreach($documents as $document): ?><option value="<?=(int)$document['id']?>"><?=h($document['nama_bab'].' v'.$document['versi'].' — '.$document['nama_lengkap'])?></option><?php endforeach; ?></select></div><div class="form-group"><label for="komentar">Catatan Revisi</label><textarea id="komentar" name="komentar" minlength="10" maxlength="5000" placeholder="Contoh: Perjelas rumusan masalah kedua dan selaraskan dengan indikator pada instrumen penelitian." required></textarea><small class="field-help"><span data-character-count>0</span>/5.000 karakter</small></div><div class="form-group"><label for="tipe_revisi">Tingkat Revisi</label><select id="tipe_revisi" name="tipe_revisi" required><option value="minor">Minor — perbaikan kecil</option><option value="major">Major — perubahan signifikan</option><option value="kritis">Kritis — perubahan mendesak</option></select></div><button type="submit" class="btn btn-primary" <?=!$documents?'disabled':''?>>Kirim Catatan Revisi</button></form></section>
+<?php else: ?>
+<section class="stats-grid" aria-label="Ringkasan administrator"><article><span>Mahasiswa</span><strong><?=count($students)?></strong><small>Akun mahasiswa</small></article><article><span>Dosen</span><strong><?=count($lecturers)?></strong><small>Akun dosen</small></article><article><span>Bimbingan</span><strong><?=count($guidances)?></strong><small>Seluruh relasi</small></article></section>
+<nav class="quick-actions" aria-label="Akses cepat administrator"><a href="#kelola-dosen"><span>01</span><div><strong>Tambah dosen</strong><small>Buat akun dosen pembimbing</small></div></a><a href="#kelola-bimbingan"><span>02</span><div><strong>Buat bimbingan</strong><small>Hubungkan mahasiswa dan dosen</small></div></a></nav>
+<div class="admin-grid"><section class="card" id="kelola-dosen"><div class="section-heading"><span class="eyebrow">AKUN DOSEN</span><h2>Tambah Dosen</h2><p>Akun dosen hanya dapat dibuat oleh administrator.</p></div><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="create_lecturer"><div class="form-group"><label for="nama_dosen">Nama Lengkap</label><input id="nama_dosen" name="nama_lengkap" maxlength="150" required></div><div class="form-grid"><div class="form-group"><label for="username_dosen">Username</label><input id="username_dosen" name="username" pattern="[A-Za-z0-9._-]{4,100}" required></div><div class="form-group"><label for="email_dosen">Email</label><input id="email_dosen" name="email" type="email" required></div></div><div class="form-group"><label for="password_dosen">Password Awal</label><div class="password-field"><input id="password_dosen" name="password" type="password" minlength="8" maxlength="72" required><button type="button" data-password-toggle aria-controls="password_dosen">Lihat</button></div><small class="field-help">Minimal 8 karakter. Sampaikan password melalui saluran pribadi.</small></div><button class="btn btn-primary" type="submit">Buat Akun Dosen</button></form></section>
+<section class="card" id="kelola-bimbingan"><div class="section-heading"><span class="eyebrow">PENUGASAN</span><h2>Buat Bimbingan</h2><p>Hubungkan mahasiswa dengan dosen dan judul skripsinya.</p></div><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="create_guidance"><div class="form-grid"><div class="form-group"><label for="mahasiswa_id">Mahasiswa</label><select id="mahasiswa_id" name="mahasiswa_id" required><option value="">Pilih mahasiswa</option><?php foreach($students as $student): ?><option value="<?=(int)$student['id']?>"><?=h($student['nama_lengkap'].' — '.$student['email'])?></option><?php endforeach; ?></select></div><div class="form-group"><label for="dosen_id">Dosen Pembimbing</label><select id="dosen_id" name="dosen_id" required><option value="">Pilih dosen</option><?php foreach($lecturers as $lecturer): ?><option value="<?=(int)$lecturer['id']?>"><?=h($lecturer['nama_lengkap'].' — '.$lecturer['email'])?></option><?php endforeach; ?></select></div></div><div class="form-group"><label for="judul_skripsi">Judul Skripsi</label><input id="judul_skripsi" name="judul_skripsi" maxlength="255" required></div><div class="form-group"><label for="deskripsi">Deskripsi Singkat</label><textarea id="deskripsi" name="deskripsi" maxlength="2000" placeholder="Fokus atau ruang lingkup penelitian (opsional)."></textarea></div><button class="btn btn-primary" type="submit" <?=(!$students||!$lecturers)?'disabled':''?>>Simpan Bimbingan</button></form></section></div>
+<section class="card"><div class="section-heading"><span class="eyebrow">DATA AKTIF</span><h2>Daftar Bimbingan</h2><p>Relasi mahasiswa, dosen, judul, dan status terkini.</p></div><?php if($guidances): ?><div class="table-wrap"><table><thead><tr><th>Mahasiswa</th><th>Dosen Pembimbing</th><th>Judul Skripsi</th><th>Status</th></tr></thead><tbody><?php foreach($guidances as $item): ?><tr><td><?=h($item['mahasiswa_nama'])?></td><td><?=h($item['dosen_nama'])?></td><td><strong><?=h($item['judul_skripsi'])?></strong></td><td><?=$statusBadge($item['status'])?></td></tr><?php endforeach; ?></tbody></table></div><?php else: ?><div class="empty-state"><strong>Belum ada bimbingan.</strong><span>Tambahkan akun dosen, lalu buat relasi bimbingan pertama.</span></div><?php endif; ?></section>
 <?php endif; ?>

@@ -1,0 +1,6 @@
+/config/database.local.php
+/storage/uploads/*
+!/storage/uploads/.htaccess
+!/storage/uploads/index.html
+*.log
+error_log

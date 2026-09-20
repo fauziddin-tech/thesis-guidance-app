@@ -1,28 +1,19 @@
-# Aktifkan mod_rewrite
+Options -Indexes
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
-    
-    # Arahkan semua request ke index.php kecuali file dan folder yang ada
+    RewriteRule ^(?:config|src|storage)(?:/|$) - [F,L,NC]
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php?page=$1 [QSA,L]
 </IfModule>
 
-# Proteksi folder uploads
-<Directory public/uploads>
-    Order Allow,Deny
-    Allow from all
-</Directory>
-
-# Proteksi folder config
-<Directory config>
-    Order Deny,Allow
-    Deny from all
-</Directory>
-
-# Proteksi folder src
-<Directory src>
-    Order Deny,Allow
-    Deny from all
-</Directory>
+<FilesMatch "(^\.|\.(?:sql|log|ini|env|md)$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
