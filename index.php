@@ -159,6 +159,25 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
     exit;
 }
 
+if (isset($_GET['action']) && $_GET['action'] === 'download_revision') {
+    if (!isset($_SESSION['user'])) {http_response_code(401);exit('Silakan masuk untuk mengunduh lampiran revisi.');}
+    $revisionId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+    if (!$revisionId) {http_response_code(400);exit('Lampiran revisi tidak valid.');}
+    $stmt = $conn->prepare('SELECT r.file_path,bs.nama_bab,bs.versi,b.mahasiswa_id,b.dosen_id FROM revisi r JOIN bab_skripsi bs ON r.bab_id=bs.id JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE r.id=? LIMIT 1');
+    $stmt->bind_param('i', $revisionId);$stmt->execute();$revision = $stmt->get_result()->fetch_assoc();$stmt->close();
+    $currentUser = $_SESSION['user'];
+    $isAllowed = $revision && ($currentUser['role'] === 'admin' || ($currentUser['role'] === 'mahasiswa' && (int)$revision['mahasiswa_id'] === (int)$currentUser['id']) || ($currentUser['role'] === 'dosen' && (int)$revision['dosen_id'] === (int)$currentUser['id']));
+    $storageRoot = realpath(__DIR__ . '/storage/uploads');
+    $filePath = $revision && $revision['file_path'] ? realpath(__DIR__ . '/' . ltrim($revision['file_path'], '/')) : false;
+    if (!$isAllowed || !$storageRoot || !$filePath || strpos($filePath, $storageRoot . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {http_response_code(404);exit('Lampiran revisi tidak ditemukan atau tidak dapat diakses.');}
+    $safeName = trim(preg_replace('/[^A-Za-z0-9._-]+/', '-', $revision['nama_bab']), '-');
+    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    header('Content-Length: ' . filesize($filePath));
+    header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.docx"');
+    header('X-Content-Type-Options: nosniff');
+    readfile($filePath);exit;
+}
+
 if (!in_array($page, $allowedPages, true)) $page = 'home';
 if ($page === 'dashboard' && !isset($_SESSION['user'])) {
     header('Location: ?page=login');
