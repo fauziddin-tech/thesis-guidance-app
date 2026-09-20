@@ -373,6 +373,10 @@ $flash=take_flash();
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="MyThesis - Platform bimbingan skripsi mahasiswa dan dosen.">
     <title><?=e($viewTitle)?> | MyThesis</title>
+    <meta name="theme-color" content="#494E6B">
+    <script>
+    (function(){var d=document.documentElement,t='dark';try{var s=localStorage.getItem('mythesis-theme');if(s==='light'||s==='dark')t=s;}catch(e){}d.setAttribute('data-theme',t);})();
+    </script>
     <link rel="icon" type="image/png" href="logo.png?v=<?=$assetVersion?>">
     <link rel="apple-touch-icon" href="logo.png?v=<?=$assetVersion?>">
     <link rel="stylesheet" href="public/css/style.css?v=<?=$assetVersion?>">
@@ -405,6 +409,12 @@ $flash=take_flash();
                     <li><a href="?page=login">Masuk</a></li>
                     <li><a href="?page=register">Daftar</a></li>
                 <?php endif; ?>
+                <li>
+                    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Ganti tema" title="Ganti tema">
+                        <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                        <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z"/></svg>
+                    </button>
+                </li>
             </ul>
         </nav>
     </div>
@@ -433,5 +443,21 @@ $flash=take_flash();
 <footer class="footer">
     <small>MyThesis &mdash; Platform Bimbingan Skripsi</small>
 </footer>
+<script>
+(function(){
+    var d=document.documentElement,btn=document.querySelector('[data-theme-toggle]');
+    if(!btn)return;
+    function current(){return d.getAttribute('data-theme')==='light'?'light':'dark';}
+    function label(){var next=current()==='dark'?'terang':'gelap';btn.setAttribute('aria-label','Ganti ke tema '+next);btn.setAttribute('title','Ganti ke tema '+next);}
+    function apply(t){d.classList.add('theme-anim');d.setAttribute('data-theme',t);label();setTimeout(function(){d.classList.remove('theme-anim');},300);}
+    label();
+    btn.addEventListener('click',function(){
+        var next=current()==='dark'?'light':'dark';
+        apply(next);
+        try{localStorage.setItem('mythesis-theme',next);}catch(e){}
+    });
+    window.addEventListener('storage',function(e){if(e.key==='mythesis-theme'&&(e.newValue==='light'||e.newValue==='dark')&&e.newValue!==current())apply(e.newValue);});
+})();
+</script>
 </body>
 </html>
