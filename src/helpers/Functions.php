@@ -33,6 +33,7 @@ if (!function_exists('render_pagination')) {
         ?>
         <div class="account-pagination">
           <div class="account-pagination-info">Menampilkan <?=e($total ? $offset+1 : 0)?>–<?=e(min($offset+$limit,$total))?> dari <?=e($total)?> <?=e($label)?></div>
+          <?php if($totalPages>1): ?>
           <nav class="account-pagination-controls" aria-label="Navigasi halaman">
             <?php if($page>1): ?><a class="account-page-link" href="<?=e($buildUrl($page-1))?>">‹ Sebelumnya</a><?php else: ?><span class="account-page-link disabled" aria-disabled="true">‹ Sebelumnya</span><?php endif; ?>
             <?php $previousPage=0; foreach($pageNumbers as $p): ?>
@@ -42,6 +43,7 @@ if (!function_exists('render_pagination')) {
             <?php endforeach; ?>
             <?php if($page<$totalPages): ?><a class="account-page-link" href="<?=e($buildUrl($page+1))?>">Berikutnya ›</a><?php else: ?><span class="account-page-link disabled" aria-disabled="true">Berikutnya ›</span><?php endif; ?>
           </nav>
+          <?php endif; ?>
         </div>
         <?php
         return (string)ob_get_clean();
@@ -53,9 +55,10 @@ function hasRole(string $role): bool { return isAuthenticated() && ($_SESSION['u
 function getCurrentUser(): ?array { return $_SESSION['user']??null; }
 
 if (!function_exists('impersonate_form')) {
-    function impersonate_form(int $studentId, string $studentName): string {
+    function impersonate_form(int $studentId, string $studentName, string $variant = 'inline'): string {
         $confirmText = e(json_encode('Buka akun ' . $studentName . '? Akses ini dicatat dan mahasiswa akan mendapat pemberitahuan.', JSON_UNESCAPED_UNICODE));
-        return '<form method="post" class="inline-form impersonate-form" onsubmit="return confirm(' . $confirmText . ')">'
+        $variantClass = $variant === 'stack' ? ' impersonate-stack' : '';
+        return '<form method="post" class="inline-form impersonate-form' . $variantClass . '" onsubmit="return confirm(' . $confirmText . ')">'
             . '<input type="hidden" name="action" value="impersonate_start">'
             . '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">'
             . '<input type="hidden" name="user_id" value="' . (int)$studentId . '">'
@@ -120,5 +123,18 @@ if (!function_exists('detect_document_type')) {
             return strtolower(pathinfo($originalName, PATHINFO_EXTENSION)) === 'docx' ? 'docx' : null;
         }
         return null;
+    }
+}
+
+if (!function_exists('name_initials')) {
+    function name_initials(string $name): string {
+        $words = preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (!$words) return '?';
+        $pick = function (string $w): string {
+            return preg_match('/./u', $w, $m) ? $m[0] : '';
+        };
+        $ini = $pick($words[0]);
+        if (count($words) > 1) $ini .= $pick($words[count($words) - 1]);
+        return function_exists('mb_strtoupper') ? mb_strtoupper($ini, 'UTF-8') : strtoupper($ini);
     }
 }

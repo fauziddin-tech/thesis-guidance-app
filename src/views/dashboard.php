@@ -170,8 +170,8 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
     $s->bind_param('iii',$uid,$studentLimit,$studentOffset);$s->execute();$studentRows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
   }
   $studentTotalPages=max(1,(int)ceil($studentTotal/$studentLimit)); if($studentPage>$studentTotalPages){$studentPage=$studentTotalPages;$studentOffset=($studentPage-1)*$studentLimit;}
-  if(!$studentRows):
   ?>
+  <?php if($studentTotal<1&&$studentSearch===''): ?>
     <div class="empty-state">Belum ada mahasiswa bimbingan.</div>
   <?php else: ?>
     <form method="get" class="account-toolbar">
@@ -179,28 +179,42 @@ $s=$conn->prepare("SELECT id FROM bimbingan WHERE mahasiswa_id=? AND status IN (
       <div class="account-search"><div><label for="student_q">Cari mahasiswa</label><div class="account-search-row"><input id="student_q" name="student_q" type="search" value="<?=e($studentSearch)?>" placeholder="Nama, email, atau judul skripsi"><button class="btn btn-secondary" type="submit">Cari</button><?php if($studentSearch!==''): ?><a class="btn btn-secondary" href="?page=dashboard#mahasiswa-bimbingan">Reset</a><?php endif; ?></div></div></div>
       <div class="account-limit"><label for="student_limit_top">Tampilkan</label><select id="student_limit_top" name="student_limit" onchange="this.form.submit()"><option value="10" <?=$studentLimit===10?'selected':''?>>10</option><option value="20" <?=$studentLimit===20?'selected':''?>>20</option><option value="50" <?=$studentLimit===50?'selected':''?>>50</option></select></div>
     </form>
+    <?php if(!$studentRows): ?>
+      <div class="empty-state">Tidak ada mahasiswa yang cocok dengan pencarian Anda.</div>
+    <?php else: ?>
     <div class="student-list">
       <?php foreach($studentRows as $b): ?>
-        <article class="student-card">
-          <div class="student-card-main">
-            <div class="student-index">MAHASISWA</div>
-            <h3><?=e($b['mahasiswa_nama'])?></h3>
-            <p class="student-email"><?=e($b['email'])?></p>
-            <div class="student-title">
-              <span class="meta-label">Judul Skripsi</span>
-              <strong><?=e($b['judul_skripsi'])?></strong>
+        <article class="student-row">
+          <div class="student-person">
+            <span class="student-avatar" aria-hidden="true"><?=e(name_initials((string)$b['mahasiswa_nama']))?></span>
+            <div class="student-person-text">
+              <strong title="<?=e($b['mahasiswa_nama'])?>"><?=e($b['mahasiswa_nama'])?></strong>
+              <small title="<?=e($b['email'])?>"><?=e($b['email'])?></small>
             </div>
           </div>
-          <div class="student-card-side">
-            <div><?=getStatusBadge($b['status'])?></div>
-            <small class="muted">Diperbarui <?=e(formatDateTime($b['updated_at']))?></small>
-            <a class="btn btn-primary" href="?page=bimbingan-detail&id=<?=e($b['id'])?>">Detail Bimbingan</a>
-            <?=impersonate_form((int)$b['mahasiswa_id'],(string)$b['mahasiswa_nama'])?>
+          <div class="student-topic">
+            <span class="meta-label">Judul skripsi</span>
+            <p class="student-title-text" title="<?=e($b['judul_skripsi'])?>"><?=e($b['judul_skripsi'])?></p>
+          </div>
+          <div class="student-status">
+            <?=getStatusBadge($b['status'])?>
+            <small>Diperbarui <?=e(formatDateTime($b['updated_at']))?></small>
+          </div>
+          <div class="student-actions">
+            <a class="btn btn-primary" href="?page=bimbingan-detail&amp;id=<?=e($b['id'])?>">Detail Bimbingan</a>
+            <details class="student-menu">
+              <summary class="btn btn-secondary">Buka akun &#9662;</summary>
+              <div class="student-menu-panel">
+                <p class="muted">Lihat tampilan mahasiswa untuk menelusuri kendala. Akses dicatat dan mahasiswa diberi tahu.</p>
+                <?=impersonate_form((int)$b['mahasiswa_id'],(string)$b['mahasiswa_nama'],'stack')?>
+              </div>
+            </details>
           </div>
         </article>
       <?php endforeach; ?>
     </div>
     <?=render_pagination($studentPage,$studentTotalPages,$studentTotal,$studentOffset,$studentLimit,['page'=>'dashboard','student_q'=>$studentSearch,'student_limit'=>$studentLimit],'student_page','#mahasiswa-bimbingan','mahasiswa')?>
+    <?php endif; ?>
   <?php endif; ?>
 </section>
 
