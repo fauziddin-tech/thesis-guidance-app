@@ -155,6 +155,19 @@ function valid_thesis_title(string $title): bool
     return $length >= 10 && $length <= 255;
 }
 
+// Alat paginasi seragam (cari + 10/20/50 per halaman). Dipakai bersama atribut data-paginate di public/js/script.js.
+function paginate_tools(string $id, string $placeholder, string $noun): string
+{
+    return '<div class="student-list-tools"><div class="student-search"><label class="sr-only" for="' . h($id) . '">Cari ' . h($noun) . '</label><input id="' . h($id) . '" type="search" placeholder="' . h($placeholder) . '" data-paginate-search></div>'
+        . '<label class="student-page-size">Tampilkan <select data-paginate-size aria-label="Jumlah ' . h($noun) . ' per halaman"><option value="10" selected>10</option><option value="20">20</option><option value="50">50</option></select> per halaman</label></div>';
+}
+
+function paginate_footer(string $noun): string
+{
+    return '<div class="student-list-empty" data-paginate-empty hidden>Tidak ada ' . h($noun) . ' yang sesuai dengan pencarian.</div>'
+        . '<div class="student-pagination"><span data-paginate-info></span><nav aria-label="Navigasi halaman ' . h($noun) . '" data-paginate-nav></nav></div>';
+}
+
 function period_label(?array $period): string
 {
     if (!$period || empty($period['tahun_ajaran'])) return 'Belum ditentukan';
