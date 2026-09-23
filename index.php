@@ -13,6 +13,7 @@ require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/src/helpers/Email.php';
 require_once __DIR__ . '/src/helpers/Pembimbing2.php';
 require_once __DIR__ . '/src/helpers/TitleRevision.php';
+require_once __DIR__ . '/src/helpers/RateLimit.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -224,8 +225,40 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 }
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
-$allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan'];
-const APP_VERSION = '1.6.0';
+$allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
+const APP_VERSION = '1.7.0';
+
+// Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
+require __DIR__ . '/src/helpers/StudentPreview.php';
+
+// Notifikasi: buka (tandai dibaca lalu arahkan ke tautannya), tandai dibaca, dan tandai semua dibaca.
+if (isset($_GET['action']) && $_GET['action'] === 'buka_notifikasi' && isset($_SESSION['user']) && empty($_SESSION['student_preview'])) {
+    $notificationId = (int)($_GET['id'] ?? 0);
+    $currentUserId = (int)$_SESSION['user']['id'];
+    $stmt = $conn->prepare('SELECT link FROM notifikasi WHERE id=? AND user_id=? LIMIT 1');
+    $stmt->bind_param('ii', $notificationId, $currentUserId);$stmt->execute();$notification = $stmt->get_result()->fetch_assoc();$stmt->close();
+    if ($notification) {
+        $stmt = $conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE id=? AND user_id=?');
+        $stmt->bind_param('ii', $notificationId, $currentUserId);$stmt->execute();$stmt->close();
+    }
+    $target = (string)($notification['link'] ?? '');
+    // Hanya tautan internal aplikasi agar tidak dapat dipakai mengalihkan ke situs lain.
+    header('Location: ' . (preg_match('/^\?page=[a-z-]+[^\s]*$/', $target) ? $target : '?page=notifikasi'));
+    exit;
+}
+if ($page === 'notifikasi' && isset($_SESSION['user']) && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $currentUserId = (int)$_SESSION['user']['id'];
+    if (!verify_csrf()) set_flash('danger', 'Sesi formulir telah berakhir. Muat ulang halaman dan coba kembali.');
+    elseif (($_POST['action'] ?? '') === 'tandai_semua') {
+        $stmt = $conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE user_id=? AND dibaca=0');$stmt->bind_param('i', $currentUserId);$stmt->execute();$stmt->close();
+        set_flash('success', 'Semua notifikasi ditandai sudah dibaca.');
+    } elseif (($_POST['action'] ?? '') === 'tandai_dibaca') {
+        $notificationId = (int)($_POST['id'] ?? 0);
+        $stmt = $conn->prepare('UPDATE notifikasi SET dibaca=1 WHERE id=? AND user_id=?');$stmt->bind_param('ii', $notificationId, $currentUserId);$stmt->execute();$stmt->close();
+    }
+    header('Location: ?page=notifikasi');
+    exit;
+}
 
 if ($page === 'logout') {
     $_SESSION = [];
@@ -369,7 +402,7 @@ if ($page === 'verifikasi') {
 }
 
 if (!in_array($page, $allowedPages, true)) $page = 'home';
-if (($page === 'dashboard' || $page === 'pemeriksaan') && !isset($_SESSION['user'])) {
+if (in_array($page, ['dashboard', 'pemeriksaan', 'notifikasi'], true) && !isset($_SESSION['user'])) {
     header('Location: ?page=login');
     exit;
 }
@@ -378,7 +411,17 @@ if ($page === 'pemeriksaan' && ($_SESSION['user']['role'] ?? '') !== 'admin') {
     exit;
 }
 
-$pageTitles = ['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard','pemeriksaan'=>'Pemeriksaan Sistem'];
+if (in_array($page, ['login', 'register', 'forgot-password', 'reset-password'], true) && isset($_SESSION['user'])) {
+    header('Location: ?page=dashboard');
+    exit;
+}
+
+$pageTitles = ['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard','pemeriksaan'=>'Pemeriksaan Sistem','forgot-password'=>'Lupa Password','reset-password'=>'Atur Ulang Password','notifikasi'=>'Notifikasi'];
+$unreadNotifications = 0;
+if (isset($_SESSION['user']) && empty($_SESSION['student_preview'])) {
+    $stmt = $conn->prepare('SELECT COUNT(*) AS total FROM notifikasi WHERE user_id=? AND dibaca=0');
+    if ($stmt) {$currentUserId = (int)$_SESSION['user']['id'];$stmt->bind_param('i', $currentUserId);$stmt->execute();$unreadNotifications = (int)$stmt->get_result()->fetch_assoc()['total'];$stmt->close();}
+}
 $assetVersion = substr(md5((string)filemtime(__DIR__ . '/public/css/style.css') . (string)filemtime(__DIR__ . '/public/js/script.js')), 0, 10);
 ?>
 <!doctype html>
@@ -403,7 +446,7 @@ $assetVersion = substr(md5((string)filemtime(__DIR__ . '/public/css/style.css') 
         <nav id="primary-navigation" class="primary-navigation" aria-label="Navigasi utama" data-nav><ul class="nav-menu">
             <li><a class="<?=$page==='home'?'is-active':''?>" <?=$page==='home'?'aria-current="page"':''?> href="?page=home">Beranda</a></li>
             <?php if (isset($_SESSION['user'])): ?>
-                <li><a class="<?=$page==='dashboard'?'is-active':''?>" <?=$page==='dashboard'?'aria-current="page"':''?> href="?page=dashboard">Dashboard</a></li><?php if (($_SESSION['user']['role'] ?? '') === 'admin'): ?><li><a class="<?=$page==='pemeriksaan'?'is-active':''?>" <?=$page==='pemeriksaan'?'aria-current="page"':''?> href="?page=pemeriksaan">Pemeriksaan</a></li><?php endif; ?><li><a href="?page=logout">Keluar</a></li>
+                <li><a class="<?=$page==='dashboard'?'is-active':''?>" <?=$page==='dashboard'?'aria-current="page"':''?> href="?page=dashboard">Dashboard</a></li><?php if (empty($_SESSION['student_preview'])): ?><li><a class="nav-notif <?=$page==='notifikasi'?'is-active':''?>" <?=$page==='notifikasi'?'aria-current="page"':''?> href="?page=notifikasi">Notifikasi<?php if($unreadNotifications): ?><span class="nav-badge" aria-label="<?=$unreadNotifications?> belum dibaca"><?=$unreadNotifications>99?'99+':$unreadNotifications?></span><?php endif; ?></a></li><?php endif; ?><?php if (($_SESSION['user']['role'] ?? '') === 'admin'): ?><li><a class="<?=$page==='pemeriksaan'?'is-active':''?>" <?=$page==='pemeriksaan'?'aria-current="page"':''?> href="?page=pemeriksaan">Pemeriksaan</a></li><?php endif; ?><li><a href="?page=logout">Keluar</a></li>
             <?php else: ?>
                 <li><a class="<?=$page==='login'?'is-active':''?>" <?=$page==='login'?'aria-current="page"':''?> href="?page=login">Masuk</a></li><li><a class="nav-cta <?=$page==='register'?'is-active':''?>" <?=$page==='register'?'aria-current="page"':''?> href="?page=register">Daftar</a></li>
             <?php endif; ?>
@@ -411,6 +454,7 @@ $assetVersion = substr(md5((string)filemtime(__DIR__ . '/public/css/style.css') 
         </ul></nav>
     </div>
 </header>
+<?php if (!empty($_SESSION['student_preview'])): ?><div class="preview-banner" role="status"><div class="container preview-banner-inner"><span><strong>Mode pratinjau</strong> — Anda melihat MyThesis sebagai <strong><?=h($_SESSION['user']['nama_lengkap'] ?? '')?></strong>. Hanya lihat; berakhir otomatis pukul <?=date('H:i', (int)$_SESSION['student_preview']['expires_at'])?>.</span><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="stop_student_preview"><button class="btn btn-primary btn-small" type="submit">Kembali ke akun saya</button></form></div></div><?php endif; ?>
 <main id="main-content" class="container main-content" tabindex="-1"><?php include __DIR__ . '/src/views/' . $page . '.php'; ?></main>
 <footer class="footer"><div class="container footer-inner"><div><strong>MyThesis</strong><small>Platform bimbingan skripsi yang terstruktur.</small></div><small>&copy; <?=date('Y')?> MyThesis &middot; Bantuan melalui administrator.</small></div></footer>
 <script src="public/js/script.js?v=<?=$assetVersion?>" defer></script>

@@ -15,6 +15,7 @@ Jika database sudah terpasang sebelumnya, jalankan file di folder `migrations/` 
 2. `20260923_add_academic_periods.sql` — periode akademik, program studi, serta NIM/prodi/angkatan mahasiswa.
 3. `20260924_add_guidance_card.sql` — tanggal persetujuan bab dan kode verifikasi kartu bimbingan.
 4. `20260925_add_lecturer_homepage.sql` — pilihan menampilkan dosen di beranda.
+5. `20260926_restore_features.sql` — Pembimbing 2, alur judul, lupa password, pembatasan login, dan log pratinjau (database mythesis.my.id sudah memilikinya).
 
 Cadangkan database sebelum menjalankan migrasi. Setelah migrasi periode akademik, masuk sebagai admin lalu tambahkan program studi; pendaftaran mahasiswa baru ditutup sampai minimal satu program studi tersedia.
 
