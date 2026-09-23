@@ -171,9 +171,10 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_revision') {
     $filePath = $revision && $revision['file_path'] ? realpath(__DIR__ . '/' . ltrim($revision['file_path'], '/')) : false;
     if (!$isAllowed || !$storageRoot || !$filePath || strpos($filePath, $storageRoot . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {http_response_code(404);exit('Lampiran revisi tidak ditemukan atau tidak dapat diakses.');}
     $safeName = trim(preg_replace('/[^A-Za-z0-9._-]+/', '-', $revision['nama_bab']), '-');
-    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    $revisionExtension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION)) === 'doc' ? 'doc' : 'docx';
+    header('Content-Type: ' . ($revisionExtension === 'doc' ? 'application/msword' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
     header('Content-Length: ' . filesize($filePath));
-    header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.docx"');
+    header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.' . $revisionExtension . '"');
     header('X-Content-Type-Options: nosniff');
     readfile($filePath);exit;
 }
