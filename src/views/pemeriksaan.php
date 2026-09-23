@@ -27,6 +27,7 @@ $migrations = [
     ['file' => '20260921_add_revision_file.sql', 'title' => 'Lampiran file revisi dosen', 'done' => column_exists($conn, 'revisi', 'file_path')],
     ['file' => '20260923_add_academic_periods.sql', 'title' => 'Periode akademik, program studi, serta NIM/prodi/angkatan', 'done' => academic_ready($conn)],
     ['file' => '20260924_add_guidance_card.sql', 'title' => 'Kartu bimbingan: tanggal persetujuan dan kode verifikasi', 'done' => column_exists($conn, 'bab_skripsi', 'disetujui_at') && column_exists($conn, 'bimbingan', 'kode_verifikasi')],
+    ['file' => '20260925_add_lecturer_homepage.sql', 'title' => 'Pilihan menampilkan dosen di beranda', 'done' => column_exists($conn, 'users', 'tampil_beranda')],
 ];
 $pendingMigrations = count(array_filter($migrations, function ($item) {return !$item['done'];}));
 

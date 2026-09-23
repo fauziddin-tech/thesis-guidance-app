@@ -217,16 +217,24 @@ if ($page === 'logout') {
 }
 
 if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
-    if (!isset($_SESSION['user'])) {
+    $requestedUserId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT) ?: (int)($_SESSION['user']['id'] ?? 0);
+    // Foto dosen yang ditampilkan di beranda boleh dilihat tanpa masuk.
+    $isPublicLecturer = false;
+    if ($requestedUserId && column_exists($conn, 'users', 'tampil_beranda')) {
+        $stmt = $conn->prepare("SELECT id FROM users WHERE id=? AND role='dosen' AND tampil_beranda=1 LIMIT 1");
+        $stmt->bind_param('i', $requestedUserId);
+        $stmt->execute();
+        $isPublicLecturer = (bool)$stmt->get_result()->fetch_assoc();
+        $stmt->close();
+    }
+    if (!$isPublicLecturer && !isset($_SESSION['user'])) {
         http_response_code(401);
         exit('Silakan masuk untuk melihat foto profil.');
     }
 
-    $currentUser = $_SESSION['user'];
+    $currentUser = $_SESSION['user'] ?? ['id' => 0, 'role' => ''];
     $currentUserId = (int)$currentUser['id'];
-    $requestedUserId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-    $requestedUserId = $requestedUserId ?: $currentUserId;
-    $isAllowed = $requestedUserId === $currentUserId || $currentUser['role'] === 'admin';
+    $isAllowed = $isPublicLecturer || $requestedUserId === $currentUserId || $currentUser['role'] === 'admin';
 
     if (!$isAllowed && $currentUser['role'] === 'dosen') {
         $stmt = $conn->prepare('SELECT id FROM bimbingan WHERE dosen_id=? AND mahasiswa_id=? LIMIT 1');
@@ -260,7 +268,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
 
     header('Content-Type: ' . $avatarMime);
     header('Content-Length: ' . filesize($avatarPath));
-    header('Cache-Control: private, max-age=3600');
+    header('Cache-Control: ' . ($isPublicLecturer ? 'public' : 'private') . ', max-age=3600');
     readfile($avatarPath);
     exit;
 }
