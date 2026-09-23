@@ -245,13 +245,15 @@ $assetVersion = substr(md5((string)filemtime(__DIR__ . '/public/css/style.css') 
     <meta name="theme-color" content="#FFFFFF">
     <title><?=htmlspecialchars($pageTitles[$page] ?? 'MyThesis', ENT_QUOTES, 'UTF-8')?> | MyThesis</title>
     <script>(function(){var d=document.documentElement,t='light';d.classList.add('js');try{var s=localStorage.getItem('mythesis-theme');if(s==='light'||s==='dark')t=s;}catch(e){}d.setAttribute('data-theme',t);})();</script>
+    <link rel="icon" type="image/png" href="logo.png<?=is_file(__DIR__ . '/logo.png') ? '?v=' . filemtime(__DIR__ . '/logo.png') : ''?>">
+    <link rel="apple-touch-icon" href="logo.png">
     <link rel="stylesheet" href="public/css/style.css?v=<?=$assetVersion?>">
 </head>
 <body data-page="<?=htmlspecialchars($page, ENT_QUOTES, 'UTF-8')?>">
 <a class="skip-link" href="#main-content">Lewati ke konten utama</a>
 <header class="navbar">
     <div class="container nav-inner">
-        <a class="brand" href="?page=home" aria-label="MyThesis, kembali ke beranda"><span class="brand-mark" aria-hidden="true">M</span><span class="brand-copy"><strong>MyThesis</strong><small>Ruang kerja skripsi</small></span></a>
+        <a class="brand" href="?page=home" aria-label="MyThesis, kembali ke beranda"><?php if(is_file(__DIR__ . '/logo.png')): ?><span class="brand-mark brand-mark-image" aria-hidden="true"><img src="logo.png?v=<?=filemtime(__DIR__ . '/logo.png')?>" alt="" width="40" height="40"></span><?php else: ?><span class="brand-mark" aria-hidden="true">M</span><?php endif; ?><span class="brand-copy"><strong>MyThesis</strong><small>Ruang kerja skripsi</small></span></a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-navigation" data-nav-toggle><span class="sr-only">Buka menu navigasi</span><span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span></button>
         <nav id="primary-navigation" class="primary-navigation" aria-label="Navigasi utama" data-nav><ul class="nav-menu">
             <li><a class="<?=$page==='home'?'is-active':''?>" <?=$page==='home'?'aria-current="page"':''?> href="?page=home">Beranda</a></li>
