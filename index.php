@@ -191,6 +191,43 @@ function paginate_footer(string $noun): string
         . '<div class="student-pagination"><span data-paginate-info></span><nav aria-label="Navigasi halaman ' . h($noun) . '" data-paginate-nav></nav></div>';
 }
 
+// Nomor bab (1–5) dari nama bab: "Bab 1", "BAB II - Kajian Teori", "bab 3" → 1, 2, 3. Selain itu 0.
+function chapter_number(string $name): int
+{
+    if (!preg_match('/^\s*bab\s*([1-5]|iv|v|i{1,3})\b/i', $name, $match)) return 0;
+    $roman = ['i' => 1, 'ii' => 2, 'iii' => 3, 'iv' => 4, 'v' => 5];
+    $value = strtolower($match[1]);
+    return ctype_digit($value) ? (int)$value : $roman[$value];
+}
+
+/**
+ * Aturan unggah bab berurutan untuk satu bimbingan:
+ * - satu bab dalam satu waktu; Bab n baru terbuka setelah Bab n-1 disetujui (seluruh pembimbing);
+ * - versi baru sebuah bab hanya boleh setelah dosen meminta revisi (status "direvisi");
+ * - selama versi terakhir masih menunggu review, unggahan dikunci.
+ * Mengembalikan ['bab' => nomor yang boleh diunggah atau 0, 'nama' => nama bab, 'versi' => versi berikutnya, 'alasan' => penjelasan].
+ */
+function chapter_upload_state(mysqli $conn, int $guidanceId): array
+{
+    $stmt = $conn->prepare('SELECT id,nama_bab,versi,status FROM bab_skripsi WHERE bimbingan_id=? ORDER BY versi,id');
+    $stmt->bind_param('i', $guidanceId);$stmt->execute();$rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+    $latest = [];$maxVersion = [];
+    foreach ($rows as $row) {
+        $number = chapter_number((string)$row['nama_bab']);
+        if ($number === 0) continue;
+        $maxVersion[$number] = max($maxVersion[$number] ?? 0, (int)$row['versi']);
+        $latest[$number] = $row;
+    }
+    for ($number = 1; $number <= 5; $number++) {
+        $row = $latest[$number] ?? null;
+        if (!$row) return ['bab' => $number, 'nama' => 'Bab ' . $number, 'versi' => 1, 'alasan' => 'Bab ' . $number . ' siap diunggah.'];
+        if ($row['status'] === 'disetujui') continue;
+        if ($row['status'] === 'direvisi') return ['bab' => $number, 'nama' => (string)$row['nama_bab'], 'versi' => $maxVersion[$number] + 1, 'alasan' => 'Unggah perbaikan ' . $row['nama_bab'] . ' sesuai catatan revisi dosen.'];
+        return ['bab' => 0, 'nama' => '', 'versi' => 0, 'alasan' => $row['nama_bab'] . ' versi ' . (int)$row['versi'] . ' masih menunggu review dosen. Unggahan berikutnya dibuka setelah dosen menyetujui atau meminta revisi.'];
+    }
+    return ['bab' => 0, 'nama' => '', 'versi' => 0, 'alasan' => 'Bab 1 sampai Bab 5 sudah disetujui seluruhnya.'];
+}
+
 function period_label(?array $period): string
 {
     if (!$period || empty($period['tahun_ajaran'])) return 'Belum ditentukan';
