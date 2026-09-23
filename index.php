@@ -189,7 +189,8 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 }
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
-$allowedPages = ['home', 'login', 'register', 'dashboard'];
+$allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan'];
+const APP_VERSION = '1.6.0';
 
 if ($page === 'logout') {
     $_SESSION = [];
@@ -325,12 +326,16 @@ if ($page === 'verifikasi') {
 }
 
 if (!in_array($page, $allowedPages, true)) $page = 'home';
-if ($page === 'dashboard' && !isset($_SESSION['user'])) {
+if (($page === 'dashboard' || $page === 'pemeriksaan') && !isset($_SESSION['user'])) {
     header('Location: ?page=login');
     exit;
 }
+if ($page === 'pemeriksaan' && ($_SESSION['user']['role'] ?? '') !== 'admin') {
+    header('Location: ?page=dashboard');
+    exit;
+}
 
-$pageTitles = ['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard'];
+$pageTitles = ['home'=>'Beranda','login'=>'Masuk','register'=>'Pendaftaran','dashboard'=>'Dashboard','pemeriksaan'=>'Pemeriksaan Sistem'];
 $assetVersion = substr(md5((string)filemtime(__DIR__ . '/public/css/style.css') . (string)filemtime(__DIR__ . '/public/js/script.js')), 0, 10);
 ?>
 <!doctype html>
@@ -355,7 +360,7 @@ $assetVersion = substr(md5((string)filemtime(__DIR__ . '/public/css/style.css') 
         <nav id="primary-navigation" class="primary-navigation" aria-label="Navigasi utama" data-nav><ul class="nav-menu">
             <li><a class="<?=$page==='home'?'is-active':''?>" <?=$page==='home'?'aria-current="page"':''?> href="?page=home">Beranda</a></li>
             <?php if (isset($_SESSION['user'])): ?>
-                <li><a class="<?=$page==='dashboard'?'is-active':''?>" <?=$page==='dashboard'?'aria-current="page"':''?> href="?page=dashboard">Dashboard</a></li><li><a href="?page=logout">Keluar</a></li>
+                <li><a class="<?=$page==='dashboard'?'is-active':''?>" <?=$page==='dashboard'?'aria-current="page"':''?> href="?page=dashboard">Dashboard</a></li><?php if (($_SESSION['user']['role'] ?? '') === 'admin'): ?><li><a class="<?=$page==='pemeriksaan'?'is-active':''?>" <?=$page==='pemeriksaan'?'aria-current="page"':''?> href="?page=pemeriksaan">Pemeriksaan</a></li><?php endif; ?><li><a href="?page=logout">Keluar</a></li>
             <?php else: ?>
                 <li><a class="<?=$page==='login'?'is-active':''?>" <?=$page==='login'?'aria-current="page"':''?> href="?page=login">Masuk</a></li><li><a class="nav-cta <?=$page==='register'?'is-active':''?>" <?=$page==='register'?'aria-current="page"':''?> href="?page=register">Daftar</a></li>
             <?php endif; ?>

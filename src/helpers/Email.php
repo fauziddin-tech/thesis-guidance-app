@@ -5,17 +5,27 @@
  * RESEND_API_KEY, MAIL_FROM; opsional MAIL_FROM_NAME, APP_URL.
  * API key tidak boleh ditulis di file ini karena file ini tersimpan di GitHub.
  */
+// Alasan kegagalan pengiriman terakhir, untuk ditampilkan pada tes email admin.
+function resend_last_error(?string $message = null): string {
+    static $last = '';
+    if ($message !== null) $last = $message;
+    return $last;
+}
+
 function send_resend_email(string $to, string $subject, string $html): bool {
+    resend_last_error('');
     $apiKey = defined('RESEND_API_KEY') ? RESEND_API_KEY : (getenv('RESEND_API_KEY') ?: '');
     $from = defined('MAIL_FROM') ? MAIL_FROM : (getenv('MAIL_FROM') ?: '');
     $fromName = defined('MAIL_FROM_NAME') ? MAIL_FROM_NAME : (getenv('MAIL_FROM_NAME') ?: 'MyThesis');
     if ($apiKey === '' || $from === '') {
         error_log('Resend email is not configured. Set RESEND_API_KEY and MAIL_FROM.');
+        resend_last_error('RESEND_API_KEY atau MAIL_FROM belum diisi di config/database.local.php.');
         return false;
     }
 
     if (!function_exists('curl_init')) {
         error_log('Resend email failed: PHP cURL extension is not enabled.');
+        resend_last_error('Ekstensi PHP cURL belum aktif di hosting.');
         return false;
     }
 
@@ -46,6 +56,12 @@ function send_resend_email(string $to, string $subject, string $html): bool {
 
     if ($response === false || $httpCode < 200 || $httpCode >= 300) {
         error_log('Resend email failed. HTTP ' . $httpCode . ($curlError ? ' - ' . $curlError : '') . ($response ? ' - ' . substr($response, 0, 500) : ''));
+        $apiMessage = '';
+        if (is_string($response) && $response !== '') {
+            $decoded = json_decode($response, true);
+            $apiMessage = is_array($decoded) ? (string)($decoded['message'] ?? '') : substr($response, 0, 200);
+        }
+        resend_last_error(trim(($httpCode ? 'HTTP ' . $httpCode : 'Tidak dapat terhubung ke Resend') . ($curlError ? ' — ' . $curlError : '') . ($apiMessage !== '' ? ' — ' . $apiMessage : '')));
         return false;
     }
 
