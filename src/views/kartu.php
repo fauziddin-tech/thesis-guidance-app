@@ -27,7 +27,7 @@ $stmt->close();
 $allowed = $guidance && (
     $currentRole === 'admin'
     || ($currentRole === 'mahasiswa' && (int)$guidance['mahasiswa_id'] === $currentUserId)
-    || ($currentRole === 'dosen' && (int)$guidance['dosen_id'] === $currentUserId)
+    || ($currentRole === 'dosen' && p2_is_member($conn, (int)$guidance['id'], $currentUserId))
 );
 if (!$allowed) {
     http_response_code(404);
@@ -64,12 +64,24 @@ $stmt->execute();
 $revisions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+// Tim pembimbing, keputusan ACC tiap dosen, dan riwayat review judul.
+$team = p2_team($conn, $guidanceId);
+$chapterIds = array_map('intval', array_column($chapters, 'id'));
+$approvalsByChapter = [];
+if ($chapterIds && p2_ready($conn)) {
+    $approvalResult = $conn->query("SELECT r.objek_id,r.updated_at,u.nama_lengkap FROM mythesis_review_dosen r JOIN users u ON u.id=r.dosen_id WHERE r.jenis='bab' AND r.keputusan='disetujui' AND r.objek_id IN (" . implode(',', $chapterIds) . ")");
+    while ($approvalResult && ($approval = $approvalResult->fetch_assoc())) $approvalsByChapter[(int)$approval['objek_id']][] = $approval;
+}
+$titleHistory = title_history_by_guidance($conn, [$guidanceId])[$guidanceId] ?? [];
+
 // Riwayat kegiatan dari seluruh data yang tercatat.
 $events = [];
 $events[] = ['time' => $guidance['created_at'], 'order' => 0, 'activity' => 'Penetapan dosen pembimbing dan judul skripsi', 'note' => '', 'actor' => 'Administrator'];
 foreach ($chapters as $chapter) {
     $events[] = ['time' => $chapter['uploaded_at'], 'order' => 1, 'activity' => 'Mengunggah ' . $chapter['nama_bab'] . ' (versi ' . (int)$chapter['versi'] . ')', 'note' => '', 'actor' => $guidance['mahasiswa_nama']];
-    if ($chapter['status'] === 'disetujui' && $chapter['disetujui_at']) {
+    if (!empty($approvalsByChapter[(int)$chapter['id']])) {
+        foreach ($approvalsByChapter[(int)$chapter['id']] as $approval) $events[] = ['time' => $approval['updated_at'], 'order' => 3, 'activity' => 'ACC ' . $chapter['nama_bab'] . ' (versi ' . (int)$chapter['versi'] . ')', 'note' => '', 'actor' => $approval['nama_lengkap']];
+    } elseif ($chapter['status'] === 'disetujui' && $chapter['disetujui_at']) {
         $events[] = ['time' => $chapter['disetujui_at'], 'order' => 3, 'activity' => 'Menyetujui ' . $chapter['nama_bab'] . ' (versi ' . (int)$chapter['versi'] . ')', 'note' => '', 'actor' => $guidance['dosen_nama']];
     }
 }
@@ -79,6 +91,12 @@ foreach ($revisions as $revision) {
     if ($note === $defaultComment) $note = 'Komentar di dalam file revisi.';
     if (mb_strlen($note) > 220) $note = mb_substr($note, 0, 217) . '…';
     $events[] = ['time' => $revision['created_at'], 'order' => 2, 'activity' => 'Revisi ' . $revision['tipe_revisi'] . ' — ' . $revision['nama_bab'] . ' (versi ' . (int)$revision['versi'] . ')', 'note' => $note, 'actor' => $revision['dosen_nama']];
+}
+$titleLabels = ['Revisi Pengajuan Judul' => 'Revisi judul diminta', 'Persetujuan Pengajuan Judul' => 'Judul disetujui', 'Pengajuan Ulang Judul' => 'Judul diajukan ulang'];
+foreach ($titleHistory as $review) {
+    $note = trim((string)($review['jawaban'] ?? ''));
+    if (mb_strlen($note) > 220) $note = mb_substr($note, 0, 217) . '…';
+    $events[] = ['time' => $review['created_at'], 'order' => 1, 'activity' => $titleLabels[$review['topik']] ?? $review['topik'], 'note' => $note, 'actor' => $review['reviewer_nama'] ?: $guidance['mahasiswa_nama']];
 }
 usort($events, function (array $first, array $second): int {
     return strcmp((string)$first['time'], (string)$second['time']) ?: $first['order'] <=> $second['order'];
@@ -90,7 +108,7 @@ foreach ($chapters as $chapter) {
     $key = mb_strtolower(trim((string)$chapter['nama_bab']));
     if (!isset($chapterSummary[$key]) || (int)$chapter['versi'] >= (int)$chapterSummary[$key]['versi']) $chapterSummary[$key] = $chapter;
 }
-$lecturerResponses = count($revisions) + count(array_filter($chapters, function ($chapter) {return $chapter['status'] === 'disetujui';}));
+$lecturerResponses = count($revisions) + ($approvalsByChapter ? array_sum(array_map('count', $approvalsByChapter)) : count(array_filter($chapters, function ($chapter) {return $chapter['status'] === 'disetujui';}))) + count(array_filter($titleHistory, function ($review) {return $review['topik'] !== 'Pengajuan Ulang Judul';}));
 $approvedChapters = count(array_filter($chapterSummary, function ($chapter) {return $chapter['status'] === 'disetujui';}));
 
 $prodiText = $academicReady ? prodi_label($guidance, 'prodi_nama', 'prodi_jenjang') : '';
@@ -147,7 +165,7 @@ table.data td.date{width:30mm;white-space:nowrap}
 .verify .qr{width:26mm;height:26mm;flex:none}
 .verify .qr svg{width:100%;height:100%}
 .verify code{font-size:12px;font-weight:700;color:#18212F}
-.sign{width:62mm;text-align:center}
+.signs{display:flex;gap:10mm}.sign{width:55mm;text-align:center}
 .sign .space{height:22mm}
 .sign strong{display:block;border-top:1px solid #18212F;padding-top:3px}
 .empty{padding:10px;border:1px dashed #B9C1CC;color:#5C6878;text-align:center}
@@ -173,7 +191,7 @@ table.data td.date{width:30mm;white-space:nowrap}
         <tr><td>Periode Mulai</td><td>:</td><td><?=h(period_label($guidance))?></td></tr>
         <?php endif; ?>
         <tr><td>Judul Skripsi</td><td>:</td><td><?=h($guidance['judul_skripsi'])?></td></tr>
-        <tr><td>Dosen Pembimbing</td><td>:</td><td><?=h($guidance['dosen_nama'])?></td></tr>
+        <?php foreach($team as $teacher): ?><tr><td>Pembimbing <?=count($team)>1?(int)$teacher['urutan']:''?></td><td>:</td><td><?=h($teacher['nama_lengkap'])?></td></tr><?php endforeach; ?>
         <tr><td>Status Bimbingan</td><td>:</td><td><?=h(status_label((string)$guidance['status']))?></td></tr>
     </table>
     <div class="photo"><?php if($studentPhotoUrl !== ''): ?><img src="<?=h($studentPhotoUrl)?>" alt="Foto <?=h($guidance['mahasiswa_nama'])?>"><?php else: ?><span>Pas foto<br>3 × 4</span><?php endif; ?></div>
@@ -210,7 +228,7 @@ table.data td.date{width:30mm;white-space:nowrap}
             <div>Kartu ini dibuat otomatis oleh MyThesis pada <?=h(tanggal_id(date('Y-m-d H:i:s'), true))?>.</div>
             <?php endif; ?>
         </div>
-        <div class="sign">Dosen Pembimbing,<div class="space"></div><strong><?=h($guidance['dosen_nama'])?></strong></div>
+        <div class="signs"><?php foreach($team as $teacher): ?><div class="sign"><?=count($team)>1?'Pembimbing '.(int)$teacher['urutan']:'Dosen Pembimbing'?>,<div class="space"></div><strong><?=h($teacher['nama_lengkap'])?></strong></div><?php endforeach; ?></div>
     </footer>
 </main>
 <?php if($verificationCode !== ''): ?>

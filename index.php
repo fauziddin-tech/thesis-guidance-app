@@ -11,6 +11,8 @@ session_set_cookie_params([
 session_start();
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/src/helpers/Email.php';
+require_once __DIR__ . '/src/helpers/Pembimbing2.php';
+require_once __DIR__ . '/src/helpers/TitleRevision.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -92,7 +94,7 @@ function tanggal_id(?string $value, bool $withTime = false): string
 
 function status_label(string $status): string
 {
-    $labels = ['menunggu_review' => 'Menunggu review', 'direvisi' => 'Perlu revisi', 'disetujui' => 'Disetujui', 'draft' => 'Draf', 'aktif' => 'Aktif', 'selesai' => 'Selesai', 'ditangguhkan' => 'Ditangguhkan'];
+    $labels = ['menunggu_review' => 'Menunggu review', 'direvisi' => 'Perlu revisi', 'disetujui' => 'Disetujui', 'draft' => 'Draf', 'pengajuan_judul' => 'Pengajuan judul', 'revisi_judul' => 'Revisi judul', 'aktif' => 'Aktif', 'selesai' => 'Selesai', 'ditangguhkan' => 'Ditangguhkan'];
     return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
 }
 
@@ -125,16 +127,18 @@ function create_student_guidance(mysqli $conn, int $studentId, string $studentNa
 {
     if (academic_ready($conn)) {
         $periodId = active_period_id($conn);
-        $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,periode_id,judul_skripsi,status) VALUES(?,?,?,?,'aktif')");
-        $stmt->bind_param('iiis', $studentId, $lecturerId, $periodId, $title);
+        $initialStatus = initial_guidance_status($conn);
+        $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,periode_id,judul_skripsi,status) VALUES(?,?,?,?,?)");
+        $stmt->bind_param('iiiss', $studentId, $lecturerId, $periodId, $title, $initialStatus);
     } else {
-        $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,judul_skripsi,status) VALUES(?,?,?,'aktif')");
-        $stmt->bind_param('iis', $studentId, $lecturerId, $title);
+        $initialStatus = initial_guidance_status($conn);
+        $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,judul_skripsi,status) VALUES(?,?,?,?)");
+        $stmt->bind_param('iiss', $studentId, $lecturerId, $title, $initialStatus);
     }
     $ok = $stmt->execute();
     $stmt->close();
     if (!$ok) return false;
-    $message = $studentName . ' memilih Anda sebagai dosen pembimbing dengan judul: ' . $title . '.';
+    $message = $studentName . ' memilih Anda sebagai dosen pembimbing dan mengajukan judul: ' . $title . '.';
     $link = '?page=dashboard#mahasiswa-bimbingan';
     $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'bimbingan_baru',?,?)");
     $stmt->bind_param('iss', $lecturerId, $message, $link);
@@ -144,9 +148,27 @@ function create_student_guidance(mysqli $conn, int $studentId, string $studentNa
     return true;
 }
 
+// File dokumen boleh berada di storage/uploads (versi sekarang) atau uploads/ (unggahan era aplikasi lama).
+function document_file_path(string $relativePath): ?string
+{
+    $filePath = realpath(__DIR__ . '/' . ltrim($relativePath, '/'));
+    if (!$filePath || !is_file($filePath)) return null;
+    foreach (['/storage/uploads', '/uploads'] as $folder) {
+        $root = realpath(__DIR__ . $folder);
+        if ($root && strpos($filePath, $root . DIRECTORY_SEPARATOR) === 0) return $filePath;
+    }
+    return null;
+}
+
+// Dosen termasuk tim pembimbing (Pembimbing 1 atau 2) dari bimbingan tertentu.
+function lecturer_in_guidance(mysqli $conn, int $guidanceId, int $lecturerId): bool
+{
+    return $guidanceId > 0 && $lecturerId > 0 && p2_is_member($conn, $guidanceId, $lecturerId);
+}
+
 function send_guidance_selected_email(mysqli $conn, int $lecturerId, string $studentName, string $title): bool
 {
-    return send_user_email($conn, $lecturerId, 'Mahasiswa bimbingan baru: ' . $studentName, 'Mahasiswa bimbingan baru', $studentName . ' memilih Anda sebagai dosen pembimbing di MyThesis.' . "\n\n" . 'Judul skripsi: ' . $title, '?page=dashboard#mahasiswa-bimbingan', 'Lihat Mahasiswa Bimbingan');
+    return send_user_email($conn, $lecturerId, 'Mahasiswa bimbingan baru: ' . $studentName, 'Mahasiswa bimbingan baru', $studentName . ' memilih Anda sebagai dosen pembimbing di MyThesis dan mengajukan judul skripsi untuk Anda tinjau.' . "\n\n" . 'Judul skripsi: ' . $title, '?page=dashboard#mahasiswa-bimbingan', 'Lihat Mahasiswa Bimbingan');
 }
 
 function valid_thesis_title(string $title): bool
@@ -237,7 +259,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
     $isAllowed = $isPublicLecturer || $requestedUserId === $currentUserId || $currentUser['role'] === 'admin';
 
     if (!$isAllowed && $currentUser['role'] === 'dosen') {
-        $stmt = $conn->prepare('SELECT id FROM bimbingan WHERE dosen_id=? AND mahasiswa_id=? LIMIT 1');
+        $stmt = $conn->prepare('SELECT b.id FROM bimbingan b WHERE ' . p2_match($conn, 'b') . ' AND b.mahasiswa_id=? LIMIT 1');
         $stmt->bind_param('ii', $currentUserId, $requestedUserId);
         $stmt->execute();
         $isAllowed = (bool)$stmt->get_result()->fetch_assoc();
@@ -285,7 +307,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
         exit('Dokumen tidak valid.');
     }
 
-    $stmt = $conn->prepare('SELECT bs.file_path, bs.nama_bab, bs.versi, b.mahasiswa_id, b.dosen_id FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE bs.id=? LIMIT 1');
+    $stmt = $conn->prepare('SELECT bs.file_path, bs.nama_bab, bs.versi, b.id AS bimbingan_id, b.mahasiswa_id, b.dosen_id FROM bab_skripsi bs JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE bs.id=? LIMIT 1');
     $stmt->bind_param('i', $documentId);
     $stmt->execute();
     $document = $stmt->get_result()->fetch_assoc();
@@ -295,12 +317,11 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
     $isAllowed = $document && (
         $currentUser['role'] === 'admin' ||
         ($currentUser['role'] === 'mahasiswa' && (int)$document['mahasiswa_id'] === (int)$currentUser['id']) ||
-        ($currentUser['role'] === 'dosen' && (int)$document['dosen_id'] === (int)$currentUser['id'])
+        ($currentUser['role'] === 'dosen' && lecturer_in_guidance($conn, (int)$document['bimbingan_id'], (int)$currentUser['id']))
     );
-    $storageRoot = realpath(__DIR__ . '/storage/uploads');
-    $filePath = $document ? realpath(__DIR__ . '/' . ltrim($document['file_path'], '/')) : false;
+    $filePath = $document ? document_file_path((string)$document['file_path']) : null;
 
-    if (!$isAllowed || !$storageRoot || !$filePath || strpos($filePath, $storageRoot . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {
+    if (!$isAllowed || !$filePath) {
         http_response_code(404);
         exit('Dokumen tidak ditemukan atau tidak dapat diakses.');
     }
@@ -320,16 +341,17 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_revision') {
     if (!isset($_SESSION['user'])) {http_response_code(401);exit('Silakan masuk untuk mengunduh lampiran revisi.');}
     $revisionId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
     if (!$revisionId) {http_response_code(400);exit('Lampiran revisi tidak valid.');}
-    $stmt = $conn->prepare('SELECT r.file_path,bs.nama_bab,bs.versi,b.mahasiswa_id,b.dosen_id FROM revisi r JOIN bab_skripsi bs ON r.bab_id=bs.id JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE r.id=? LIMIT 1');
+    $stmt = $conn->prepare('SELECT r.file_path,bs.nama_bab,bs.versi,b.id AS bimbingan_id,b.mahasiswa_id,b.dosen_id FROM revisi r JOIN bab_skripsi bs ON r.bab_id=bs.id JOIN bimbingan b ON bs.bimbingan_id=b.id WHERE r.id=? LIMIT 1');
     $stmt->bind_param('i', $revisionId);$stmt->execute();$revision = $stmt->get_result()->fetch_assoc();$stmt->close();
     $currentUser = $_SESSION['user'];
-    $isAllowed = $revision && ($currentUser['role'] === 'admin' || ($currentUser['role'] === 'mahasiswa' && (int)$revision['mahasiswa_id'] === (int)$currentUser['id']) || ($currentUser['role'] === 'dosen' && (int)$revision['dosen_id'] === (int)$currentUser['id']));
-    $storageRoot = realpath(__DIR__ . '/storage/uploads');
-    $filePath = $revision && $revision['file_path'] ? realpath(__DIR__ . '/' . ltrim($revision['file_path'], '/')) : false;
-    if (!$isAllowed || !$storageRoot || !$filePath || strpos($filePath, $storageRoot . DIRECTORY_SEPARATOR) !== 0 || !is_file($filePath)) {http_response_code(404);exit('Lampiran revisi tidak ditemukan atau tidak dapat diakses.');}
+    $isAllowed = $revision && ($currentUser['role'] === 'admin' || ($currentUser['role'] === 'mahasiswa' && (int)$revision['mahasiswa_id'] === (int)$currentUser['id']) || ($currentUser['role'] === 'dosen' && lecturer_in_guidance($conn, (int)$revision['bimbingan_id'], (int)$currentUser['id'])));
+    $filePath = $revision && $revision['file_path'] ? document_file_path((string)$revision['file_path']) : null;
+    if (!$isAllowed || !$filePath) {http_response_code(404);exit('Lampiran revisi tidak ditemukan atau tidak dapat diakses.');}
     $safeName = trim(preg_replace('/[^A-Za-z0-9._-]+/', '-', $revision['nama_bab']), '-');
-    $revisionExtension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION)) === 'doc' ? 'doc' : 'docx';
-    header('Content-Type: ' . ($revisionExtension === 'doc' ? 'application/msword' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+    $revisionExtension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+    $revisionMimes = ['doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'pdf' => 'application/pdf'];
+    if (!isset($revisionMimes[$revisionExtension])) $revisionExtension = 'docx';
+    header('Content-Type: ' . $revisionMimes[$revisionExtension]);
     header('Content-Length: ' . filesize($filePath));
     header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.' . $revisionExtension . '"');
     header('X-Content-Type-Options: nosniff');

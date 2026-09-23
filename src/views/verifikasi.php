@@ -92,7 +92,7 @@ small{display:block;margin-top:14px;color:#5C6878}
                 <tr><td>Periode Mulai</td><td><?=h(period_label($result))?></td></tr>
                 <?php endif; ?>
                 <tr><td>Judul Skripsi</td><td><?=h($result['judul_skripsi'])?></td></tr>
-                <tr><td>Dosen Pembimbing</td><td><?=h($result['dosen_nama'])?></td></tr>
+                <?php $team=p2_team($conn,(int)$result['id']); foreach($team as $teacher): ?><tr><td>Pembimbing <?=count($team)>1?(int)$teacher['urutan']:''?></td><td><?=h($teacher['nama_lengkap'])?></td></tr><?php endforeach; ?>
                 <tr><td>Status Bimbingan</td><td><?=h(status_label((string)$result['status']))?></td></tr>
                 <tr><td>Tanggapan dosen</td><td><?=(int)$stats['revisi'] + (int)$stats['disetujui']?> kali (revisi &amp; persetujuan)</td></tr>
                 <tr><td>Dokumen diunggah</td><td><?=(int)$stats['dokumen']?> dokumen, <?=(int)$stats['disetujui']?> disetujui</td></tr>
