@@ -95,6 +95,11 @@ $approvedChapters = count(array_filter($chapterSummary, function ($chapter) {ret
 
 $prodiText = $academicReady ? prodi_label($guidance, 'prodi_nama', 'prodi_jenjang') : '';
 $logoExists = is_file(__DIR__ . '/../../logo.png');
+$studentPhotoUrl = '';
+foreach (['jpg', 'png', 'webp'] as $photoExtension) {
+    $photoPath = __DIR__ . '/../../storage/avatars/user-' . (int)$guidance['mahasiswa_id'] . '.' . $photoExtension;
+    if (is_file($photoPath)) {$studentPhotoUrl = '?action=avatar&id=' . (int)$guidance['mahasiswa_id'] . '&v=' . filemtime($photoPath);break;}
+}
 $backUrl = '?page=dashboard';
 $fileName = 'Kartu-Bimbingan-' . preg_replace('/[^A-Za-z0-9]+/', '-', (string)($guidance['nim'] ?? $guidance['mahasiswa_nama']));
 ?>
@@ -119,7 +124,10 @@ body{margin:0;background:#E9ECF0;color:#18212F;font:13px/1.5 "Segoe UI",Arial,sa
 .head img{width:58px;height:58px;object-fit:contain}
 .head h1{margin:0;font-size:19px;letter-spacing:.06em}
 .head p{margin:2px 0 0;color:#5C6878}
-.identity{width:100%;margin:14px 0 6px;border-collapse:collapse}
+.identity-row{display:flex;align-items:flex-start;gap:8mm;margin:14px 0 6px}
+.identity{flex:1;width:100%;border-collapse:collapse}
+.photo{flex:none;display:flex;align-items:center;justify-content:center;width:30mm;height:40mm;overflow:hidden;border:1px solid #B9C1CC;background:#F7F8FA;color:#8A94A3;font-size:11px;text-align:center}
+.photo img{width:100%;height:100%;object-fit:cover}
 .identity td{padding:3px 0;vertical-align:top}
 .identity td:first-child{width:36mm;color:#5C6878}
 .identity td:nth-child(2){width:5mm}
@@ -144,7 +152,7 @@ table.data td.date{width:30mm;white-space:nowrap}
 .sign strong{display:block;border-top:1px solid #18212F;padding-top:3px}
 .empty{padding:10px;border:1px dashed #B9C1CC;color:#5C6878;text-align:center}
 @media print{body{background:#fff}.toolbar{display:none}.sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}tr{page-break-inside:avoid}}
-@media(max-width:820px){.sheet{width:auto;min-height:0;margin:0;padding:18px}.foot,.summary{flex-direction:column;align-items:stretch}.sign{width:auto}}
+@media(max-width:820px){.sheet{width:auto;min-height:0;margin:0;padding:18px}.identity-row{flex-direction:column-reverse;align-items:center}.foot,.summary{flex-direction:column;align-items:stretch}.sign{width:auto}}
 </style>
 </head>
 <body>
@@ -155,6 +163,7 @@ table.data td.date{width:30mm;white-space:nowrap}
         <div><h1>KARTU BIMBINGAN SKRIPSI</h1><p>MyThesis — Ruang kerja bimbingan skripsi</p></div>
     </header>
 
+    <div class="identity-row">
     <table class="identity">
         <tr><td>Nama Mahasiswa</td><td>:</td><td><strong><?=h($guidance['mahasiswa_nama'])?></strong></td></tr>
         <?php if($academicReady): ?>
@@ -167,6 +176,8 @@ table.data td.date{width:30mm;white-space:nowrap}
         <tr><td>Dosen Pembimbing</td><td>:</td><td><?=h($guidance['dosen_nama'])?></td></tr>
         <tr><td>Status Bimbingan</td><td>:</td><td><?=h(status_label((string)$guidance['status']))?></td></tr>
     </table>
+    <div class="photo"><?php if($studentPhotoUrl !== ''): ?><img src="<?=h($studentPhotoUrl)?>" alt="Foto <?=h($guidance['mahasiswa_nama'])?>"><?php else: ?><span>Pas foto<br>3 × 4</span><?php endif; ?></div>
+    </div>
 
     <div class="summary">
         <div><strong><?=$lecturerResponses?></strong><span>Tanggapan dosen (revisi &amp; persetujuan)</span></div>
