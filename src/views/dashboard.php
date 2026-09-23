@@ -162,8 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 else {
                     $message = $user['nama_lengkap'] . ' mengunggah ' . $chapterName . ' versi ' . $version . '.';$link = '?page=dashboard#mahasiswa-bimbingan';
                     $recipientId = (int)$guidance['dosen_id'];
-                    $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'unggah_bab',?,?)");
-                    $stmt->bind_param('iss', $recipientId, $message, $link);$stmt->execute();$stmt->close();
+                    notify_user($conn, $recipientId, 'unggah_bab', $message, $link, 'Dokumen baru menunggu review: ' . $chapterName, 'Dokumen baru menunggu review', 'Tinjau Dokumen');
                     set_flash('success', 'Dokumen berhasil diunggah dan dosen pembimbing telah diberi notifikasi.');
                 }
             }
@@ -181,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($ok) {
                 $message = $chapter['nama_bab'] . ' telah disetujui oleh dosen pembimbing.';$link = '?page=dashboard#dokumen-saya';
                 $recipientId = (int)$chapter['mahasiswa_id'];
-                $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'persetujuan',?,?)");$stmt->bind_param('iss', $recipientId, $message, $link);$stmt->execute();$stmt->close();
+                notify_user($conn, $recipientId, 'persetujuan', $message, $link, 'Dokumen disetujui: ' . $chapter['nama_bab'], 'Dokumen Anda disetujui', 'Lihat Dokumen');
                 set_flash('success', 'Dokumen berhasil disetujui.');
             } else set_flash('danger', 'Status dokumen belum dapat diperbarui.');
         } else {
@@ -224,7 +223,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($ok) {
                     $message = 'Catatan revisi baru diberikan untuk ' . $chapter['nama_bab'] . '.';$link = '?page=dashboard#dokumen-saya';
                     $recipientId = (int)$chapter['mahasiswa_id'];
-                    $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'revisi',?,?)");$stmt->bind_param('iss', $recipientId, $message, $link);$stmt->execute();$stmt->close();
+                    notify_user($conn, $recipientId, 'revisi', $message . ($comment !== '' ? "\n\nCatatan dosen: " . $comment : ''), $link, 'Revisi baru: ' . $chapter['nama_bab'], 'Catatan revisi baru dari dosen pembimbing', 'Lihat Revisi');
                     set_flash('success', 'File revisi berisi komentar berhasil dikirim kepada mahasiswa.');
                 } else {if ($revisionAbsolutePath && is_file($revisionAbsolutePath)) unlink($revisionAbsolutePath);set_flash('danger', 'Catatan revisi belum dapat disimpan.');}
             }
@@ -369,7 +368,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             else {
                 $hash = password_hash($password, PASSWORD_DEFAULT);$lecturerRole = 'dosen';$phone = '';
                 $stmt = $conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp) VALUES(?,?,?,?,?,?)');$stmt->bind_param('ssssss', $username, $email, $hash, $lecturerRole, $name, $phone);$ok = $stmt->execute();$stmt->close();
-                set_flash($ok ? 'success' : 'danger', $ok ? 'Akun dosen berhasil dibuat.' : 'Akun dosen belum dapat dibuat.');
+                $mailSent = false;
+                if ($ok) {
+                    $newLecturerId = (int)$conn->insert_id;
+                    $mailSent = send_user_email($conn, $newLecturerId, 'Akun dosen MyThesis Anda', 'Akun dosen pembimbing telah dibuat',
+                        "Administrator telah membuatkan akun dosen pembimbing untuk Anda di MyThesis.\n\nUsername: " . $username . "\nEmail: " . $email . "\nPassword awal: " . $password
+                        . "\n\nSegera ganti password awal setelah masuk melalui menu profil (Edit Profil dan Sandi). Jangan bagikan password kepada siapa pun.",
+                        '?page=login', 'Masuk ke MyThesis');
+                }
+                if (!$ok) set_flash('danger', 'Akun dosen belum dapat dibuat.');
+                elseif ($mailSent) set_flash('success', 'Akun dosen berhasil dibuat dan rincian akun telah dikirim ke ' . $email . '.');
+                else set_flash('warning', 'Akun dosen berhasil dibuat, tetapi email gagal terkirim. Sampaikan username dan password awal kepada dosen secara pribadi.');
             }
         }
         $redirectDashboard('kelola-dosen');
@@ -396,7 +405,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $ok = $stmt->execute();$stmt->close();
             if ($ok) {
                 $message = 'Bimbingan baru untuk judul: ' . $title . '.';$link = '?page=dashboard#bimbingan-saya';
-                $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'bimbingan_baru',?,?)");$stmt->bind_param('iss', $studentId, $message, $link);$stmt->execute();$stmt->close();
+                notify_user($conn, $studentId, 'bimbingan_baru', $message, $link, 'Bimbingan skripsi Anda telah dibuat', 'Bimbingan skripsi baru', 'Lihat Bimbingan');
+                $stmt = $conn->prepare('SELECT nama_lengkap FROM users WHERE id=? LIMIT 1');$stmt->bind_param('i', $studentId);$stmt->execute();$assignedStudent = $stmt->get_result()->fetch_assoc();$stmt->close();
+                notify_user($conn, $lecturerId, 'bimbingan_baru', 'Anda ditetapkan sebagai dosen pembimbing ' . ($assignedStudent['nama_lengkap'] ?? 'mahasiswa') . ' dengan judul: ' . $title . '.', '?page=dashboard#mahasiswa-bimbingan', 'Mahasiswa bimbingan baru', 'Mahasiswa bimbingan baru', 'Lihat Mahasiswa Bimbingan');
                 set_flash('success', 'Relasi bimbingan berhasil dibuat.');
             } else set_flash('danger', 'Relasi bimbingan belum dapat dibuat.');
         }

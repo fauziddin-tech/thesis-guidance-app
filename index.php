@@ -10,6 +10,7 @@ session_set_cookie_params([
 ]);
 session_start();
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/src/helpers/Email.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -97,6 +98,7 @@ function status_label(string $status): string
 
 function app_base_url(): string
 {
+    if (defined('APP_URL') && APP_URL !== '') return rtrim(APP_URL, '/') . '/';
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
     $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
     if (!preg_match('/^[A-Za-z0-9.-]+(:\d+)?$/', $host)) $host = 'localhost';
@@ -119,7 +121,7 @@ function active_period_id(mysqli $conn): ?int
 }
 
 // Membuat relasi bimbingan yang dipilih mahasiswa sendiri, lalu memberi notifikasi kepada dosen.
-function create_student_guidance(mysqli $conn, int $studentId, string $studentName, int $lecturerId, string $title): bool
+function create_student_guidance(mysqli $conn, int $studentId, string $studentName, int $lecturerId, string $title, bool $sendEmail = true): bool
 {
     if (academic_ready($conn)) {
         $periodId = active_period_id($conn);
@@ -138,7 +140,13 @@ function create_student_guidance(mysqli $conn, int $studentId, string $studentNa
     $stmt->bind_param('iss', $lecturerId, $message, $link);
     $stmt->execute();
     $stmt->close();
+    if ($sendEmail) send_guidance_selected_email($conn, $lecturerId, $studentName, $title);
     return true;
+}
+
+function send_guidance_selected_email(mysqli $conn, int $lecturerId, string $studentName, string $title): bool
+{
+    return send_user_email($conn, $lecturerId, 'Mahasiswa bimbingan baru: ' . $studentName, 'Mahasiswa bimbingan baru', $studentName . ' memilih Anda sebagai dosen pembimbing di MyThesis.' . "\n\n" . 'Judul skripsi: ' . $title, '?page=dashboard#mahasiswa-bimbingan', 'Lihat Mahasiswa Bimbingan');
 }
 
 function valid_thesis_title(string $title): bool

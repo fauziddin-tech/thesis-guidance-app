@@ -19,7 +19,7 @@ Cadangkan database sebelum menjalankan migrasi. Setelah migrasi periode akademik
 
 ## 2. Buat konfigurasi lokal
 
-Salin `config/database.example.php` menjadi `config/database.local.php`, kemudian isi data cPanel:
+Salin `config/database.example.php` menjadi `config/database.local.php`, kemudian isi data database, `APP_URL`, serta pengaturan email Resend (`MAIL_FROM`, `MAIL_FROM_NAME`, `RESEND_API_KEY`). Format array di bawah ini juga masih didukung untuk database:
 
 ```php
 <?php

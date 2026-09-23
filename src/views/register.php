@@ -34,9 +34,20 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             else{$stmt=$conn->prepare('INSERT INTO users(username,email,password,role,nama_lengkap,no_telp) VALUES(?,?,?,?,?,?)');$stmt->bind_param('ssssss',$username,$email,$hash,$role,$nama,$telp);}
             $conn->begin_transaction();
             $ok=$stmt->execute();$newUserId=(int)$conn->insert_id;$stmt->close();
-            if($ok&&$lecturerChoices)$ok=create_student_guidance($conn,$newUserId,$nama,$lecturerId,$title);
+            if($ok&&$lecturerChoices)$ok=create_student_guidance($conn,$newUserId,$nama,$lecturerId,$title,false);
             if($ok)$conn->commit();else $conn->rollback();
-            $registerMessage=$ok?'Pendaftaran berhasil'.($lecturerChoices?' dan dosen pembimbing Anda telah diberi notifikasi':'').'. Silakan masuk menggunakan akun Anda.':'Pendaftaran belum berhasil. Silakan coba kembali.';$registerType=$ok?'success':'danger';
+            $mailSent=false;
+            if($ok){
+                // Email dikirim setelah data tersimpan permanen.
+                $lecturerName='';foreach($lecturerChoices as $lecturer){if((int)$lecturer['id']===$lecturerId){$lecturerName=$lecturer['nama_lengkap'];break;}}
+                $prodiName='';foreach($prodiList as $prodi){if((int)$prodi['id']===$prodiId){$prodiName=prodi_label($prodi);break;}}
+                $details=['Username: '.$username,'Email: '.$email];
+                if($academicReady){$details[]='NIM: '.$nim;$details[]='Program Studi: '.$prodiName;$details[]='Angkatan: '.$angkatan;}
+                if($lecturerChoices){$details[]='Dosen Pembimbing: '.$lecturerName;$details[]='Judul Skripsi: '.$title;}
+                $mailSent=send_user_email($conn,$newUserId,'Akun MyThesis Anda telah dibuat','Selamat datang di MyThesis',"Terima kasih telah mendaftar. Berikut informasi akun Anda:\n\n".implode("\n",$details)."\n\nMasuk menggunakan username atau email di atas dengan password yang Anda buat saat mendaftar. Demi keamanan, password tidak dikirim melalui email.",'?page=login','Masuk ke MyThesis');
+                if($lecturerChoices)send_guidance_selected_email($conn,$lecturerId,$nama,$title);
+            }
+            $registerMessage=$ok?'Pendaftaran berhasil'.($lecturerChoices?' dan dosen pembimbing Anda telah diberi notifikasi':'').'.'.($mailSent?' Rincian akun telah dikirim ke '.$email.'.':'').' Silakan masuk menggunakan akun Anda.':'Pendaftaran belum berhasil. Silakan coba kembali.';$registerType=$ok?'success':'danger';
         }
     }
 }
