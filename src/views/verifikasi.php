@@ -89,7 +89,7 @@ small{display:block;margin-top:14px;color:#5C6878}
                 <?php if($academicReady): ?>
                 <tr><td>NIM</td><td><?=h($maskNim($result['nim'] ?? ''))?></td></tr>
                 <tr><td>Program Studi</td><td><?=h(prodi_label($result, 'prodi_nama', 'prodi_jenjang') ?: '—')?></td></tr>
-                <tr><td>Periode</td><td><?=h(period_label($result))?></td></tr>
+                <tr><td>Periode Mulai</td><td><?=h(period_label($result))?></td></tr>
                 <?php endif; ?>
                 <tr><td>Judul Skripsi</td><td><?=h($result['judul_skripsi'])?></td></tr>
                 <tr><td>Dosen Pembimbing</td><td><?=h($result['dosen_nama'])?></td></tr>

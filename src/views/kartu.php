@@ -170,7 +170,7 @@ table.data td.date{width:30mm;white-space:nowrap}
         <tr><td>NIM</td><td>:</td><td><?=h($guidance['nim'] ?: '—')?></td></tr>
         <tr><td>Program Studi</td><td>:</td><td><?=h($prodiText !== '' ? $prodiText : '—')?></td></tr>
         <tr><td>Angkatan</td><td>:</td><td><?=h($guidance['angkatan'] ?: '—')?></td></tr>
-        <tr><td>Periode</td><td>:</td><td><?=h(period_label($guidance))?></td></tr>
+        <tr><td>Periode Mulai</td><td>:</td><td><?=h(period_label($guidance))?></td></tr>
         <?php endif; ?>
         <tr><td>Judul Skripsi</td><td>:</td><td><?=h($guidance['judul_skripsi'])?></td></tr>
         <tr><td>Dosen Pembimbing</td><td>:</td><td><?=h($guidance['dosen_nama'])?></td></tr>
