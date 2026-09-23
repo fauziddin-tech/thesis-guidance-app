@@ -60,6 +60,7 @@ Pastikan folder `storage/uploads` tersedia dan dapat ditulis oleh PHP. Mulai den
 1. cPanel → **Cron Jobs** → *Add New Cron Job*, pilih *Once Per Day* (misalnya pukul 02:00).
 2. Command: `php /home/USERNAME/public_html/mythesis/src/tools/backup-database.php`
 3. Opsional di `config/database.local.php`: `define('BACKUP_DIR', '/home/USERNAME/backup-mythesis');` dan `define('BACKUP_KEEP_DAYS', 14);`
+4. Untuk jadwal mingguan, tambahkan juga `define('BACKUP_KEEP_DAYS', 56);` (simpan 8 minggu) dan `define('BACKUP_MAX_AGE_HOURS', 192);` (Pemeriksaan Sistem baru memberi peringatan setelah 8 hari).
 
 Memulihkan: unduh file `.sql.gz`, ekstrak, lalu impor lewat phpMyAdmin → Impor.
 

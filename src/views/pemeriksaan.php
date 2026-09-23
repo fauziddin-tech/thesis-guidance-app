@@ -83,7 +83,9 @@ if (!is_array($backupStatus)) {
     $security[] = ['Backup database', 'fail', 'Backup terakhir gagal (' . tanggal_id((string)$backupStatus['waktu'], true) . '): ' . (string)($backupStatus['pesan'] ?? 'lihat error_log') . '.'];
 } else {
     $backupAge = time() - (int)strtotime((string)$backupStatus['waktu']);
-    $security[] = ['Backup database', $backupAge <= 36 * 3600 ? 'ok' : 'warn', 'Terakhir ' . tanggal_id((string)$backupStatus['waktu'], true) . ' — ' . number_format((int)$backupStatus['ukuran'] / 1024, 1, ',', '.') . ' KB, ' . (int)$backupStatus['tabel'] . ' tabel. Tersimpan ' . (int)$backupStatus['jumlah_backup'] . ' backup di ' . (string)$backupStatus['folder'] . '.' . ($backupAge > 36 * 3600 ? ' Sudah lebih dari 36 jam; periksa Cron Jobs.' : '')];
+    // Batas usia backup: 36 jam untuk jadwal harian; atur BACKUP_MAX_AGE_HOURS (mis. 192 untuk mingguan) di database.local.php.
+    $backupMaxHours = defined('BACKUP_MAX_AGE_HOURS') ? max(1, (int)BACKUP_MAX_AGE_HOURS) : 36;
+    $security[] = ['Backup database', $backupAge <= $backupMaxHours * 3600 ? 'ok' : 'warn', 'Terakhir ' . tanggal_id((string)$backupStatus['waktu'], true) . ' — ' . number_format((int)$backupStatus['ukuran'] / 1024, 1, ',', '.') . ' KB, ' . (int)$backupStatus['tabel'] . ' tabel. Tersimpan ' . (int)$backupStatus['jumlah_backup'] . ' backup di ' . (string)$backupStatus['folder'] . '.' . ($backupAge > $backupMaxHours * 3600 ? ' Sudah lebih dari ' . ($backupMaxHours % 24 === 0 ? ($backupMaxHours / 24) . ' hari' : $backupMaxHours . ' jam') . '; periksa Cron Jobs.' : '')];
 }
 $groups['Keamanan dan Penyimpanan'] = $security;
 
