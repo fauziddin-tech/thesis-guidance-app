@@ -52,3 +52,14 @@ Pastikan folder `storage/uploads` tersedia dan dapat ditulis oleh PHP. Mulai den
 - Jangan mengunggah file konfigurasi lokal, log, backup database, atau dokumen mahasiswa ke GitHub.
 - Gunakan HTTPS pada domain produksi.
 - Cadangkan basis data dan folder `storage/uploads` secara berkala.
+
+### Backup database otomatis
+
+`src/tools/backup-database.php` membuat salinan lengkap database (struktur dan data) tanpa `mysqldump`, dalam bentuk `.sql.gz`, ke folder `~/backup-mythesis` di luar `public_html`. Backup yang lebih lama dari 14 hari dihapus otomatis. Status terakhir tampil di halaman Pemeriksaan Sistem.
+
+1. cPanel → **Cron Jobs** → *Add New Cron Job*, pilih *Once Per Day* (misalnya pukul 02:00).
+2. Command: `php /home/USERNAME/public_html/mythesis/src/tools/backup-database.php`
+3. Opsional di `config/database.local.php`: `define('BACKUP_DIR', '/home/USERNAME/backup-mythesis');` dan `define('BACKUP_KEEP_DAYS', 14);`
+
+Memulihkan: unduh file `.sql.gz`, ekstrak, lalu impor lewat phpMyAdmin → Impor.
+

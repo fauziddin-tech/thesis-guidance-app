@@ -75,6 +75,16 @@ foreach (['storage/uploads' => 'Dokumen skripsi', 'storage/avatars' => 'Foto pro
 }
 $freeSpace = @disk_free_space($root . '/storage');
 if ($freeSpace !== false) $security[] = ['Ruang penyimpanan', $freeSpace >= 500 * 1024 * 1024 ? 'ok' : 'warn', 'Sisa ruang ' . number_format($freeSpace / 1024 / 1024 / 1024, 1, ',', '.') . ' GB.'];
+// Backup database otomatis (src/tools/backup-database.php lewat Cron Jobs).
+$backupStatus = is_file($root . '/storage/backup-status.json') ? json_decode((string)file_get_contents($root . '/storage/backup-status.json'), true) : null;
+if (!is_array($backupStatus)) {
+    $security[] = ['Backup database', 'fail', 'Belum pernah berjalan. Jadwalkan src/tools/backup-database.php di cPanel → Cron Jobs (setiap malam).'];
+} elseif (empty($backupStatus['ok'])) {
+    $security[] = ['Backup database', 'fail', 'Backup terakhir gagal (' . tanggal_id((string)$backupStatus['waktu'], true) . '): ' . (string)($backupStatus['pesan'] ?? 'lihat error_log') . '.'];
+} else {
+    $backupAge = time() - (int)strtotime((string)$backupStatus['waktu']);
+    $security[] = ['Backup database', $backupAge <= 36 * 3600 ? 'ok' : 'warn', 'Terakhir ' . tanggal_id((string)$backupStatus['waktu'], true) . ' — ' . number_format((int)$backupStatus['ukuran'] / 1024, 1, ',', '.') . ' KB, ' . (int)$backupStatus['tabel'] . ' tabel. Tersimpan ' . (int)$backupStatus['jumlah_backup'] . ' backup di ' . (string)$backupStatus['folder'] . '.' . ($backupAge > 36 * 3600 ? ' Sudah lebih dari 36 jam; periksa Cron Jobs.' : '')];
+}
 $groups['Keamanan dan Penyimpanan'] = $security;
 
 $mail = [];

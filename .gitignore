@@ -7,3 +7,4 @@
 !/storage/avatars/index.html
 *.log
 error_log
+/storage/backup-status.json

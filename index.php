@@ -228,6 +228,53 @@ function chapter_upload_state(mysqli $conn, int $guidanceId): array
     return ['bab' => 0, 'nama' => '', 'versi' => 0, 'alasan' => 'Bab 1 sampai Bab 5 sudah disetujui seluruhnya.'];
 }
 
+// Versi terakhir tiap bab (1–5) untuk banyak bimbingan sekaligus: [bimbingan_id => [nomor => baris|null]].
+function chapter_progress_map(mysqli $conn, array $guidanceIds): array
+{
+    $guidanceIds = array_values(array_unique(array_filter(array_map('intval', $guidanceIds))));
+    $map = [];
+    foreach ($guidanceIds as $id) $map[$id] = array_fill(1, 5, null);
+    if (!$guidanceIds) return $map;
+    $result = $conn->query('SELECT id,bimbingan_id,nama_bab,versi,status FROM bab_skripsi WHERE bimbingan_id IN (' . implode(',', $guidanceIds) . ') ORDER BY versi,id');
+    while ($result && ($row = $result->fetch_assoc())) {
+        $number = chapter_number((string)$row['nama_bab']);
+        if ($number) $map[(int)$row['bimbingan_id']][$number] = $row;
+    }
+    return $map;
+}
+
+/**
+ * Langkah progres skripsi: Judul lalu Bab 1–5. Status tiap langkah:
+ * selesai | review | revisi | terbuka (giliran berikutnya) | terkunci.
+ */
+function thesis_progress_steps(array $guidance, array $chapters): array
+{
+    $titleStatus = (string)$guidance['status'];
+    $steps = [['label' => 'Judul', 'status' => $titleStatus === 'pengajuan_judul' ? 'review' : ($titleStatus === 'revisi_judul' ? 'revisi' : 'selesai'), 'versi' => 0]];
+    $open = in_array($titleStatus, ['aktif', 'selesai'], true);
+    for ($number = 1; $number <= 5; $number++) {
+        $row = $chapters[$number] ?? null;
+        $state = !$row ? ($open ? 'terbuka' : 'terkunci') : ['disetujui' => 'selesai', 'menunggu_review' => 'review', 'direvisi' => 'revisi'][$row['status']] ?? 'review';
+        if (!$row || $state !== 'selesai') $open = false;
+        $steps[] = ['label' => 'Bab ' . $number, 'status' => $state, 'versi' => $row ? (int)$row['versi'] : 0];
+    }
+    return $steps;
+}
+
+function progress_status_label(string $status): string
+{
+    return ['selesai' => 'Disetujui', 'review' => 'Menunggu review', 'revisi' => 'Perlu revisi', 'terbuka' => 'Siap diunggah', 'terkunci' => 'Belum terbuka'][$status] ?? $status;
+}
+
+// Tampilan ringkas (titik) untuk tabel dosen/admin.
+function progress_dots(array $steps): string
+{
+    $approved = count(array_filter(array_slice($steps, 1), function ($step) {return $step['status'] === 'selesai';}));
+    $html = '<span class="progress-dots" aria-label="Progres: ' . $approved . ' dari 5 bab disetujui">';
+    foreach ($steps as $step) $html .= '<span class="dot dot-' . h($step['status']) . '" title="' . h($step['label'] . ': ' . progress_status_label($step['status']) . ($step['versi'] > 1 ? ' (versi ' . $step['versi'] . ')' : '')) . '"></span>';
+    return $html . '<small>' . $approved . '/5 bab disetujui</small></span>';
+}
+
 function period_label(?array $period): string
 {
     if (!$period || empty($period['tahun_ajaran'])) return 'Belum ditentukan';
