@@ -1,5 +1,23 @@
 -- Database untuk Aplikasi Bimbingan Skripsi
 
+CREATE TABLE IF NOT EXISTS program_studi (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    kode VARCHAR(20) NULL,
+    nama VARCHAR(150) NOT NULL,
+    jenjang ENUM('D3', 'D4', 'S1', 'S2', 'S3') NOT NULL DEFAULT 'S1',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_program_studi (nama, jenjang)
+);
+
+CREATE TABLE IF NOT EXISTS periode_akademik (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tahun_ajaran CHAR(9) NOT NULL,
+    semester ENUM('ganjil', 'genap') NOT NULL,
+    is_aktif TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_periode_akademik (tahun_ajaran, semester)
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id INT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(100) UNIQUE NOT NULL,
@@ -7,22 +25,29 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'dosen', 'mahasiswa') NOT NULL,
     nama_lengkap VARCHAR(150) NOT NULL,
+    nim VARCHAR(30) NULL,
+    prodi_id INT NULL,
+    angkatan SMALLINT NULL,
     no_telp VARCHAR(15),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_users_nim (nim),
+    FOREIGN KEY (prodi_id) REFERENCES program_studi(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS bimbingan (
     id INT PRIMARY KEY AUTO_INCREMENT,
     mahasiswa_id INT NOT NULL,
     dosen_id INT NOT NULL,
+    periode_id INT NULL,
     judul_skripsi VARCHAR(255) NOT NULL,
     deskripsi TEXT,
     status ENUM('aktif', 'selesai', 'ditangguhkan') DEFAULT 'aktif',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (mahasiswa_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (dosen_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (dosen_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (periode_id) REFERENCES periode_akademik(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS bab_skripsi (

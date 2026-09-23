@@ -7,6 +7,15 @@
 3. Berikan seluruh hak yang diperlukan kepada pengguna database.
 4. Import `schema.sql` melalui phpMyAdmin.
 
+### Migrasi untuk instalasi lama
+
+Jika database sudah terpasang sebelumnya, jalankan file di folder `migrations/` yang belum pernah dijalankan, berurutan sesuai tanggal:
+
+1. `20260921_add_revision_file.sql` — lampiran file revisi dosen.
+2. `20260923_add_academic_periods.sql` — periode akademik, program studi, serta NIM/prodi/angkatan mahasiswa.
+
+Cadangkan database sebelum menjalankan migrasi. Setelah migrasi periode akademik, masuk sebagai admin lalu tambahkan program studi; pendaftaran mahasiswa baru ditutup sampai minimal satu program studi tersedia.
+
 ## 2. Buat konfigurasi lokal
 
 Salin `config/database.example.php` menjadi `config/database.local.php`, kemudian isi data cPanel:

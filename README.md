@@ -8,6 +8,8 @@ MyThesis adalah aplikasi bimbingan skripsi berbasis PHP dan MySQL untuk mengelol
 - Dashboard administrator untuk membuat akun dosen dan relasi bimbingan
 - Foto profil untuk mahasiswa, dosen, dan administrator tanpa migrasi database
 - Unggah dokumen Word (DOC dan DOCX) dengan versioning otomatis; PDF tidak diterima
+- Periode akademik (tahun ajaran + semester) dengan satu periode aktif, filter periode untuk dosen dan admin
+- Master program studi; pendaftaran mahasiswa mencatat NIM, program studi, dan tahun angkatan
 - Revisi dosen dituliskan sebagai komentar di dalam file Word, lalu diunggah kembali untuk mahasiswa
 - Antrean review, catatan revisi, dan persetujuan dokumen
 - Unduhan dokumen dengan pemeriksaan hak akses

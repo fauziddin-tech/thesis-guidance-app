@@ -53,6 +53,54 @@ function pull_flash(): ?array
     return $flash;
 }
 
+// Mengecek apakah migrasi periode akademik sudah dijalankan agar aplikasi tetap berjalan sebelum migrasi.
+function academic_ready(mysqli $conn): bool
+{
+    static $ready = null;
+    if ($ready !== null) return $ready;
+    $ready = true;
+    foreach ([['bimbingan', 'periode_id'], ['users', 'nim']] as $check) {
+        $result = $conn->query("SHOW COLUMNS FROM `" . $check[0] . "` LIKE '" . $check[1] . "'");
+        $found = $result && $result->num_rows > 0;
+        if ($result) $result->free();
+        if (!$found) {$ready = false;break;}
+    }
+    return $ready;
+}
+
+function period_label(?array $period): string
+{
+    if (!$period || empty($period['tahun_ajaran'])) return 'Belum ditentukan';
+    return $period['tahun_ajaran'] . ' ' . ucfirst((string)$period['semester']);
+}
+
+// Usulan periode berdasarkan tanggal: Agustus–Januari = ganjil, Februari–Juli = genap.
+function suggested_period(): array
+{
+    $year = (int)date('Y');
+    $month = (int)date('n');
+    if ($month >= 8) return [$year . '/' . ($year + 1), 'ganjil'];
+    if ($month === 1) return [($year - 1) . '/' . $year, 'ganjil'];
+    return [($year - 1) . '/' . $year, 'genap'];
+}
+
+function valid_nim(string $nim): bool
+{
+    return (bool)preg_match('/^[A-Za-z0-9.-]{5,30}$/', $nim);
+}
+
+function angkatan_options(): array
+{
+    $year = (int)date('Y');
+    return range($year, $year - 15);
+}
+
+function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'jenjang'): string
+{
+    if (empty($row[$nameKey])) return '';
+    return trim((string)($row[$levelKey] ?? '') . ' ' . (string)$row[$nameKey]);
+}
+
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard'];
 

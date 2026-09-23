@@ -27,3 +27,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   const profileMenu=document.querySelector('.profile-menu');if(profileMenu){document.addEventListener('click',event=>{if(profileMenu.open&&!profileMenu.contains(event.target))profileMenu.removeAttribute('open')});document.addEventListener('keydown',event=>{if(event.key==='Escape')profileMenu.removeAttribute('open')})}
   document.addEventListener('submit',event=>{const form=event.target;if(!(form instanceof HTMLFormElement))return;if(form.dataset.confirm&&!window.confirm(form.dataset.confirm)){event.preventDefault();return}if(event.defaultPrevented||!form.checkValidity())return;const button=event.submitter||form.querySelector('button[type="submit"],button:not([type])');if(button&&!form.dataset.noLock){button.disabled=true;button.dataset.originalText=button.textContent;button.textContent='Memproses…';button.setAttribute('aria-busy','true')}});
 });
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('[data-auto-submit]').forEach(select=>select.addEventListener('change',()=>{const form=select.form;if(!form)return;if(form.requestSubmit)form.requestSubmit();else form.submit()}));
+  const studentSelect=document.getElementById('data_mahasiswa_id');
+  if(studentSelect){studentSelect.addEventListener('change',()=>{const option=studentSelect.selectedOptions[0];if(!option)return;const nim=document.getElementById('data_nim');const prodi=document.getElementById('data_prodi');const angkatan=document.getElementById('data_angkatan');if(nim)nim.value=option.dataset.nim||'';if(prodi)prodi.value=option.dataset.prodi&&option.dataset.prodi!=='0'?option.dataset.prodi:'';if(angkatan)angkatan.value=option.dataset.angkatan&&option.dataset.angkatan!=='0'?option.dataset.angkatan:''})}
+});
