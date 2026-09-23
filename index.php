@@ -104,6 +104,49 @@ function app_base_url(): string
     return ($https ? 'https' : 'http') . '://' . $host . $path . '/';
 }
 
+function lecturer_options(mysqli $conn): array
+{
+    $result = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen' ORDER BY nama_lengkap");
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+function active_period_id(mysqli $conn): ?int
+{
+    if (!academic_ready($conn)) return null;
+    $result = $conn->query('SELECT id FROM periode_akademik WHERE is_aktif=1 ORDER BY id DESC LIMIT 1');
+    $row = $result ? $result->fetch_assoc() : null;
+    return $row ? (int)$row['id'] : null;
+}
+
+// Membuat relasi bimbingan yang dipilih mahasiswa sendiri, lalu memberi notifikasi kepada dosen.
+function create_student_guidance(mysqli $conn, int $studentId, string $studentName, int $lecturerId, string $title): bool
+{
+    if (academic_ready($conn)) {
+        $periodId = active_period_id($conn);
+        $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,periode_id,judul_skripsi,status) VALUES(?,?,?,?,'aktif')");
+        $stmt->bind_param('iiis', $studentId, $lecturerId, $periodId, $title);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO bimbingan(mahasiswa_id,dosen_id,judul_skripsi,status) VALUES(?,?,?,'aktif')");
+        $stmt->bind_param('iis', $studentId, $lecturerId, $title);
+    }
+    $ok = $stmt->execute();
+    $stmt->close();
+    if (!$ok) return false;
+    $message = $studentName . ' memilih Anda sebagai dosen pembimbing dengan judul: ' . $title . '.';
+    $link = '?page=dashboard#mahasiswa-bimbingan';
+    $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'bimbingan_baru',?,?)");
+    $stmt->bind_param('iss', $lecturerId, $message, $link);
+    $stmt->execute();
+    $stmt->close();
+    return true;
+}
+
+function valid_thesis_title(string $title): bool
+{
+    $length = mb_strlen($title);
+    return $length >= 10 && $length <= 255;
+}
+
 function period_label(?array $period): string
 {
     if (!$period || empty($period['tahun_ajaran'])) return 'Belum ditentukan';
