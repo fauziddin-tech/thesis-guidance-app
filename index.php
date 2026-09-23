@@ -68,6 +68,42 @@ function academic_ready(mysqli $conn): bool
     return $ready;
 }
 
+function column_exists(mysqli $conn, string $table, string $column): bool
+{
+    static $cache = [];
+    $key = $table . '.' . $column;
+    if (isset($cache[$key])) return $cache[$key];
+    $result = $conn->query("SHOW COLUMNS FROM `" . str_replace('`', '', $table) . "` LIKE '" . $conn->real_escape_string($column) . "'");
+    $cache[$key] = $result && $result->num_rows > 0;
+    if ($result) $result->free();
+    return $cache[$key];
+}
+
+function tanggal_id(?string $value, bool $withTime = false): string
+{
+    if (!$value) return '—';
+    $timestamp = strtotime($value);
+    if (!$timestamp) return '—';
+    $months = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    $text = date('j', $timestamp) . ' ' . $months[(int)date('n', $timestamp)] . ' ' . date('Y', $timestamp);
+    return $withTime ? $text . ', ' . date('H:i', $timestamp) : $text;
+}
+
+function status_label(string $status): string
+{
+    $labels = ['menunggu_review' => 'Menunggu review', 'direvisi' => 'Perlu revisi', 'disetujui' => 'Disetujui', 'draft' => 'Draf', 'aktif' => 'Aktif', 'selesai' => 'Selesai', 'ditangguhkan' => 'Ditangguhkan'];
+    return $labels[$status] ?? ucfirst(str_replace('_', ' ', $status));
+}
+
+function app_base_url(): string
+{
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    if (!preg_match('/^[A-Za-z0-9.-]+(:\d+)?$/', $host)) $host = 'localhost';
+    $path = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/'))), '/');
+    return ($https ? 'https' : 'http') . '://' . $host . $path . '/';
+}
+
 function period_label(?array $period): string
 {
     if (!$period || empty($period['tahun_ajaran'])) return 'Belum ditentukan';
@@ -225,6 +261,16 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_revision') {
     header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.' . $revisionExtension . '"');
     header('X-Content-Type-Options: nosniff');
     readfile($filePath);exit;
+}
+
+if (isset($_GET['action']) && $_GET['action'] === 'kartu') {
+    require __DIR__ . '/src/views/kartu.php';
+    exit;
+}
+
+if ($page === 'verifikasi') {
+    require __DIR__ . '/src/views/verifikasi.php';
+    exit;
 }
 
 if (!in_array($page, $allowedPages, true)) $page = 'home';

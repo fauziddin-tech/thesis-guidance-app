@@ -13,6 +13,7 @@ Jika database sudah terpasang sebelumnya, jalankan file di folder `migrations/` 
 
 1. `20260921_add_revision_file.sql` — lampiran file revisi dosen.
 2. `20260923_add_academic_periods.sql` — periode akademik, program studi, serta NIM/prodi/angkatan mahasiswa.
+3. `20260924_add_guidance_card.sql` — tanggal persetujuan bab dan kode verifikasi kartu bimbingan.
 
 Cadangkan database sebelum menjalankan migrasi. Setelah migrasi periode akademik, masuk sebagai admin lalu tambahkan program studi; pendaftaran mahasiswa baru ditutup sampai minimal satu program studi tersedia.
 

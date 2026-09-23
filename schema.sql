@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS bimbingan (
     judul_skripsi VARCHAR(255) NOT NULL,
     deskripsi TEXT,
     status ENUM('aktif', 'selesai', 'ditangguhkan') DEFAULT 'aktif',
+    kode_verifikasi VARCHAR(16) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (mahasiswa_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (dosen_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (periode_id) REFERENCES periode_akademik(id) ON DELETE SET NULL
+    FOREIGN KEY (periode_id) REFERENCES periode_akademik(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_bimbingan_kode_verifikasi (kode_verifikasi)
 );
 
 CREATE TABLE IF NOT EXISTS bab_skripsi (
@@ -57,6 +59,7 @@ CREATE TABLE IF NOT EXISTS bab_skripsi (
     file_path VARCHAR(255) NOT NULL,
     versi INT DEFAULT 1,
     status ENUM('draft', 'menunggu_review', 'direvisi', 'disetujui') DEFAULT 'draft',
+    disetujui_at TIMESTAMP NULL DEFAULT NULL,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (bimbingan_id) REFERENCES bimbingan(id) ON DELETE CASCADE
 );
