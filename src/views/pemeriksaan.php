@@ -29,6 +29,7 @@ $migrations = [
     ['file' => '20260924_add_guidance_card.sql', 'title' => 'Kartu bimbingan: tanggal persetujuan dan kode verifikasi', 'done' => column_exists($conn, 'bab_skripsi', 'disetujui_at') && column_exists($conn, 'bimbingan', 'kode_verifikasi')],
     ['file' => '20260925_add_lecturer_homepage.sql', 'title' => 'Pilihan menampilkan dosen di beranda', 'done' => column_exists($conn, 'users', 'tampil_beranda')],
     ['file' => '20260926_restore_features.sql', 'title' => 'Pembimbing 2, alur judul, lupa password, pembatasan login, log pratinjau', 'done' => p2_ready($conn) && column_exists($conn, 'password_resets', 'token_hash') && column_exists($conn, 'rate_limits', 'rkey') && column_exists($conn, 'impersonation_logs', 'target_id') && initial_guidance_status($conn) === 'pengajuan_judul'],
+    ['file' => '20260927_add_meeting_log.sql', 'title' => 'Log pertemuan bimbingan dan target minimal pertemuan', 'done' => meeting_ready($conn)],
 ];
 $pendingMigrations = count(array_filter($migrations, function ($item) {return !$item['done'];}));
 

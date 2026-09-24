@@ -14,6 +14,7 @@ require_once __DIR__ . '/src/helpers/Email.php';
 require_once __DIR__ . '/src/helpers/Pembimbing2.php';
 require_once __DIR__ . '/src/helpers/TitleRevision.php';
 require_once __DIR__ . '/src/helpers/RateLimit.php';
+require_once __DIR__ . '/src/helpers/MeetingLog.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -310,7 +311,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.8.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';

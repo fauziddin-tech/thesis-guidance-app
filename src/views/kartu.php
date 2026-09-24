@@ -73,6 +73,10 @@ if ($chapterIds && p2_ready($conn)) {
     while ($approvalResult && ($approval = $approvalResult->fetch_assoc())) $approvalsByChapter[(int)$approval['objek_id']][] = $approval;
 }
 $titleHistory = title_history_by_guidance($conn, [$guidanceId])[$guidanceId] ?? [];
+// Pertemuan bimbingan yang sudah dikonfirmasi dosen, urut dari yang terlama.
+$meetingReady = meeting_ready($conn);
+$meetings = $meetingReady ? array_reverse(meeting_logs_by_guidance($conn, [$guidanceId], true)[$guidanceId] ?? []) : [];
+$meetingTarget = meeting_target();
 
 // Riwayat kegiatan dari seluruh data yang tercatat.
 $events = [];
@@ -201,7 +205,19 @@ table.data td.date{width:30mm;white-space:nowrap}
         <div><strong><?=$lecturerResponses?></strong><span>Tanggapan dosen (revisi &amp; persetujuan)</span></div>
         <div><strong><?=count($chapters)?></strong><span>Dokumen diunggah</span></div>
         <div><strong><?=$approvedChapters?> / <?=count($chapterSummary)?></strong><span>Bab disetujui</span></div>
+        <?php if($meetingReady): ?><div><strong><?=count($meetings)?> / <?=$meetingTarget?></strong><span>Pertemuan terkonfirmasi<?=count($meetings)>=$meetingTarget?' — target terpenuhi':''?></span></div><?php endif; ?>
     </div>
+
+    <?php if($meetingReady): ?>
+    <h2>Log Pertemuan Bimbingan</h2>
+    <?php if($meetings): ?>
+    <table class="data"><thead><tr><th>No</th><th>Tanggal</th><th>Pembimbing</th><th>Topik dan Arahan</th><th>Dikonfirmasi</th></tr></thead><tbody>
+    <?php $number = 1; foreach($meetings as $meeting): ?>
+        <tr><td class="num"><?=$number++?></td><td class="date"><?=h(tanggal_id($meeting['tanggal']))?><span class="note"><?=h(meeting_method_label((string)$meeting['metode']))?></span></td><td><?=h($meeting['dosen_nama'])?></td><td><?=h($meeting['topik'])?><span class="note"><?=h(mb_strlen($meeting['catatan']) > 220 ? mb_substr($meeting['catatan'], 0, 217) . '…' : $meeting['catatan'])?></span></td><td class="date"><?=h(tanggal_id($meeting['dikonfirmasi_at']))?></td></tr>
+    <?php endforeach; ?>
+    </tbody></table>
+    <?php else: ?><div class="empty">Belum ada pertemuan bimbingan yang dikonfirmasi dosen.</div><?php endif; ?>
+    <?php endif; ?>
 
     <h2>Rekap Bab</h2>
     <?php if($chapterSummary): ?>
