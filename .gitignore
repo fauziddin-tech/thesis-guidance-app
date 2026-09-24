@@ -8,3 +8,9 @@
 *.log
 error_log
 /storage/backup-status.json
+# Data dan berkas khusus server (tidak disimpan di Git)
+/uploads/
+/logo.png
+/storage/access-audit/
+/config/.htaccess
+/src/.htaccess
