@@ -67,6 +67,16 @@ $security[] = ['HTTPS', $https ? 'ok' : 'fail', $https ? 'Situs diakses melalui 
 $security[] = ['Konfigurasi lokal', is_file($root . '/config/database.local.php') ? 'ok' : 'warn', is_file($root . '/config/database.local.php') ? 'config/database.local.php ditemukan.' : 'Konfigurasi dibaca dari environment variable.'];
 $rootHtaccess = is_file($root . '/.htaccess') ? (string)file_get_contents($root . '/.htaccess') : '';
 $security[] = ['Perlindungan folder sistem', strpos($rootHtaccess, 'config|src|storage') !== false ? 'ok' : 'fail', strpos($rootHtaccess, 'config|src|storage') !== false ? 'Folder config, src, dan storage tidak dapat dibuka langsung dari browser.' : 'Aturan .htaccess untuk memblokir folder config, src, dan storage tidak ditemukan.'];
+// Folder uploads/ dari aplikasi lama masih dibaca (lewat index.php) tetapi tidak boleh dibuka langsung.
+if (is_dir($root . '/uploads')) {
+    $legacyBlocked = preg_match('/RewriteRule \^\(\?:[^)]*\buploads\b/', $rootHtaccess) === 1;
+    $security[] = ['Folder uploads/ lama', $legacyBlocked ? 'ok' : 'fail', $legacyBlocked ? 'Dokumen era aplikasi lama tidak dapat dibuka langsung dari browser.' : 'Folder uploads/ belum diblokir di .htaccess; dokumen lama dapat diunduh tanpa login.'];
+}
+$errorLogBlocked = strpos($rootHtaccess, 'error_log') !== false;
+if (is_file($root . '/error_log')) $security[] = ['File error_log', $errorLogBlocked ? 'ok' : 'fail', $errorLogBlocked ? 'error_log tidak dapat dibuka dari browser.' : 'error_log dapat dibuka dari browser dan dapat membocorkan detail teknis.'];
+// Sisa aplikasi lama yang tidak dipakai lagi oleh MyThesis versi sekarang.
+$legacyItems = array_values(array_filter(['app', 'database', 'download.php', 'export-riwayat.php', 'profile-photo.php', 'konsultasi.php', 'seminar.php', 'src/controllers', 'src/models'], function ($item) use ($root) {return file_exists($root . '/' . $item);}));
+$security[] = ['Sisa aplikasi lama', $legacyItems ? 'warn' : 'ok', $legacyItems ? 'Masih ada: ' . implode(', ', $legacyItems) . '. Pindahkan ke luar public_html (lihat DEPLOYMENT.md).' : 'Tidak ada berkas aplikasi lama di folder situs.'];
 foreach (['storage/uploads' => 'Dokumen skripsi', 'storage/avatars' => 'Foto profil'] as $folder => $label) {
     $path = $root . '/' . $folder;
     $writable = is_dir($path) && is_writable($path);

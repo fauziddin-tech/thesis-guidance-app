@@ -2,13 +2,15 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteRule ^(?:config|src|storage)(?:/|$) - [F,L,NC]
+    # Folder sistem dan sisa aplikasi lama tidak boleh dibuka langsung dari browser.
+    # Dokumen di uploads/ (era aplikasi lama) tetap dapat diunduh melalui index.php setelah login.
+    RewriteRule ^(?:config|src|storage|uploads|app|database|migrations)(?:/|$) - [F,L,NC]
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php?page=$1 [QSA,L]
 </IfModule>
 
-<FilesMatch "(^\.|\.(?:sql|log|ini|env|md)$)">
+<FilesMatch "(^\.|^error_log$|\.(?:sql|log|ini|env|md|gz|zip|bak)$)">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
