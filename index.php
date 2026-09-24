@@ -15,6 +15,7 @@ require_once __DIR__ . '/src/helpers/Pembimbing2.php';
 require_once __DIR__ . '/src/helpers/TitleRevision.php';
 require_once __DIR__ . '/src/helpers/RateLimit.php';
 require_once __DIR__ . '/src/helpers/MeetingLog.php';
+require_once __DIR__ . '/src/helpers/Backup.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -311,7 +312,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.8.0';
+const APP_VERSION = '1.9.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';
@@ -474,6 +475,21 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_revision') {
     header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.' . $revisionExtension . '"');
     header('X-Content-Type-Options: nosniff');
     readfile($filePath);exit;
+}
+
+// Unduh file backup database: hanya administrator (bukan dalam mode pratinjau), nama file divalidasi ketat.
+if (isset($_GET['action']) && $_GET['action'] === 'download_backup') {
+    if (($_SESSION['user']['role'] ?? '') !== 'admin' || !empty($_SESSION['student_preview'])) {http_response_code(403);exit('Hanya administrator yang dapat mengunduh backup.');}
+    $backupPath = backup_file_path((string)($_GET['file'] ?? ''));
+    if (!$backupPath) {http_response_code(404);exit('File backup tidak ditemukan.');}
+    error_log('MyThesis: backup ' . basename($backupPath) . ' diunduh oleh admin #' . (int)$_SESSION['user']['id'] . ' dari ' . (string)($_SERVER['REMOTE_ADDR'] ?? '-'));
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/gzip');
+    header('Content-Length: ' . filesize($backupPath));
+    header('Content-Disposition: attachment; filename="' . basename($backupPath) . '"');
+    header('Cache-Control: no-store, private');
+    readfile($backupPath);
+    exit;
 }
 
 if (isset($_GET['action']) && $_GET['action'] === 'kartu') {
