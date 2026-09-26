@@ -13,7 +13,8 @@ $meetingStatusBadge = function (string $status): string {
 <div class="meeting-block">
 <?php if(count($guidances)>1): ?><p class="progress-title"><?=h($item['judul_skripsi'])?></p><?php endif; ?>
 <div class="meeting-meter<?=$confirmed>=$meetingTarget?' is-complete':''?>"><div class="meeting-meter-copy"><strong><?=$confirmed?> / <?=$meetingTarget?></strong><span><?=$confirmed>=$meetingTarget?'Target pertemuan minimal sudah terpenuhi.':'Pertemuan dikonfirmasi. Kurang '.($meetingTarget-$confirmed).' pertemuan lagi.'?></span></div><div class="meeting-meter-bar" role="progressbar" aria-valuemin="0" aria-valuemax="<?=$meetingTarget?>" aria-valuenow="<?=min($confirmed,$meetingTarget)?>" aria-label="Pertemuan terkonfirmasi"><span style="width:<?=$percent?>%"></span></div></div>
-<?php if(meeting_open_status((string)$item['status'])): ?>
+<?php if(approval_is_pending($item)): ?><div class="upload-lock" role="status"><strong>Pencatatan pertemuan belum dibuka</strong><span>Pertemuan dapat dicatat setelah pendaftaran Anda diterima dosen pembimbing.</span></div>
+<?php elseif(meeting_open_status((string)$item['status'])): ?>
 <details class="meeting-form"<?=$draft?' open':''?>><summary class="btn btn-primary btn-small">Catat Pertemuan Baru</summary>
 <form method="post"><?=csrf_field()?><input type="hidden" name="action" value="record_meeting"><input type="hidden" name="bimbingan_id" value="<?=$guidanceId?>">
 <div class="form-grid"><div class="form-group"><label for="meeting-dosen-<?=$guidanceId?>">Dosen yang ditemui</label><select id="meeting-dosen-<?=$guidanceId?>" name="dosen_id" required><?php if(count($team)>1): ?><option value="">Pilih dosen pembimbing</option><?php endif; ?><?php foreach($team as $teacher): ?><option value="<?=(int)$teacher['id']?>"<?=(int)($draft['dosen_id']??0)===(int)$teacher['id']?' selected':''?>>Pembimbing <?=(int)$teacher['urutan']?> — <?=h($teacher['nama_lengkap'])?></option><?php endforeach; ?></select></div>

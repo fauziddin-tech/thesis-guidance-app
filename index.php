@@ -16,6 +16,7 @@ require_once __DIR__ . '/src/helpers/TitleRevision.php';
 require_once __DIR__ . '/src/helpers/RateLimit.php';
 require_once __DIR__ . '/src/helpers/MeetingLog.php';
 require_once __DIR__ . '/src/helpers/Backup.php';
+require_once __DIR__ . '/src/helpers/StudentApproval.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -139,10 +140,13 @@ function create_student_guidance(mysqli $conn, int $studentId, string $studentNa
         $stmt->bind_param('iiss', $studentId, $lecturerId, $title, $initialStatus);
     }
     $ok = $stmt->execute();
+    $newGuidanceId = (int)$conn->insert_id;
     $stmt->close();
     if (!$ok) return false;
-    $message = $studentName . ' memilih Anda sebagai dosen pembimbing dan mengajukan judul: ' . $title . '.';
-    $link = '?page=dashboard#mahasiswa-bimbingan';
+    // Pendaftaran mandiri menunggu diterima dosen pembimbing (mencegah akun iseng/ganda).
+    if (approval_ready($conn)) {$stmt = $conn->prepare('UPDATE bimbingan SET menunggu_persetujuan=1 WHERE id=?');$stmt->bind_param('i', $newGuidanceId);$stmt->execute();$stmt->close();}
+    $message = $studentName . ' mendaftar sebagai mahasiswa bimbingan Anda dengan judul: ' . $title . '. Terima atau tolak pendaftaran ini di dashboard.';
+    $link = '?page=dashboard#pendaftaran-baru';
     $stmt = $conn->prepare("INSERT INTO notifikasi(user_id,tipe,pesan,link) VALUES(?,'bimbingan_baru',?,?)");
     $stmt->bind_param('iss', $lecturerId, $message, $link);
     $stmt->execute();
@@ -171,7 +175,7 @@ function lecturer_in_guidance(mysqli $conn, int $guidanceId, int $lecturerId): b
 
 function send_guidance_selected_email(mysqli $conn, int $lecturerId, string $studentName, string $title): bool
 {
-    return send_user_email($conn, $lecturerId, 'Mahasiswa bimbingan baru: ' . $studentName, 'Mahasiswa bimbingan baru', $studentName . ' memilih Anda sebagai dosen pembimbing di MyThesis dan mengajukan judul skripsi untuk Anda tinjau.' . "\n\n" . 'Judul skripsi: ' . $title, '?page=dashboard#mahasiswa-bimbingan', 'Lihat Mahasiswa Bimbingan');
+    return send_user_email($conn, $lecturerId, 'Mahasiswa bimbingan baru: ' . $studentName, 'Mahasiswa bimbingan baru', $studentName . ' mendaftar di MyThesis dan memilih Anda sebagai dosen pembimbing. Periksa datanya, lalu terima atau tolak pendaftaran ini dari dashboard. Akun yang ganda atau tidak dikenal dapat langsung ditolak dan dihapus.' . "\n\n" . 'Judul skripsi: ' . $title, '?page=dashboard#pendaftaran-baru', 'Tinjau Pendaftaran');
 }
 
 function valid_thesis_title(string $title): bool
@@ -312,7 +316,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';

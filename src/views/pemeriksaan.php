@@ -31,6 +31,7 @@ $migrations = [
     ['file' => '20260926_restore_features.sql', 'title' => 'Pembimbing 2, alur judul, lupa password, pembatasan login, log pratinjau', 'done' => p2_ready($conn) && column_exists($conn, 'password_resets', 'token_hash') && column_exists($conn, 'rate_limits', 'rkey') && column_exists($conn, 'impersonation_logs', 'target_id') && initial_guidance_status($conn) === 'pengajuan_judul'],
     ['file' => '20260927_add_meeting_log.sql', 'title' => 'Log pertemuan bimbingan dan target minimal pertemuan', 'done' => meeting_ready($conn)],
     ['file' => '20260928_pembimbing2_format_review.sql', 'title' => 'Pembimbing 2 memeriksa format naskah proposal (menyelaraskan status lama)', 'done' => !p2_ready($conn) || (int)$conn->query("SELECT (SELECT COUNT(*) FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id JOIN mythesis_review_dosen r ON r.jenis='bab' AND r.objek_id=bs.id AND r.dosen_id=b.dosen_id WHERE bs.status IN ('menunggu_review','direvisi') AND bs.status<>r.keputusan AND bs.nama_bab NOT LIKE 'Naskah Proposal%') + (SELECT COUNT(*) FROM bimbingan b JOIN mythesis_review_dosen r ON r.jenis='judul' AND r.objek_id=b.id AND r.dosen_id=b.dosen_id AND r.keputusan='disetujui' WHERE b.status='pengajuan_judul') AS total")->fetch_assoc()['total'] === 0],
+    ['file' => '20260929_student_approval.sql', 'title' => 'Penerimaan pendaftaran mahasiswa oleh dosen pembimbing', 'done' => approval_ready($conn)],
 ];
 $pendingMigrations = count(array_filter($migrations, function ($item) {return !$item['done'];}));
 
@@ -116,6 +117,11 @@ $groups['Email'] = $mail;
 $data = [];
 $lecturerCount = $countQuery("SELECT COUNT(*) FROM users WHERE role='dosen'");
 $studentCount = $countQuery("SELECT COUNT(*) FROM users WHERE role='mahasiswa'");
+// Kemungkinan akun mahasiswa ganda (nama sama). Hapus lewat Daftar Bimbingan > Hapus bimbingan.
+$duplicateNames = [];
+$duplicateResult = $conn->query("SELECT GROUP_CONCAT(nama_lengkap ORDER BY id SEPARATOR ' / ') AS nama FROM users WHERE role='mahasiswa' GROUP BY REGEXP_REPLACE(LOWER(TRIM(nama_lengkap)),'[[:space:]]+',' ') HAVING COUNT(*)>1 LIMIT 10");
+while ($duplicateResult && ($row = $duplicateResult->fetch_assoc())) $duplicateNames[] = $row['nama'];
+$data[] = ['Akun mahasiswa ganda', $duplicateNames ? 'warn' : 'ok', $duplicateNames ? 'Nama yang terdaftar lebih dari sekali: ' . implode('; ', $duplicateNames) . '. Periksa di Daftar Bimbingan, lalu hapus akun yang tidak dipakai.' : 'Tidak ada nama mahasiswa yang terdaftar ganda.'];
 $data[] = ['Akun dosen', $lecturerCount ? 'ok' : 'warn', $lecturerCount ? $lecturerCount . ' dosen terdaftar.' : 'Belum ada dosen; mahasiswa tidak dapat memilih pembimbing saat mendaftar.'];
 if (academic_ready($conn)) {
     $activePeriodCount = $countQuery('SELECT COUNT(*) FROM periode_akademik WHERE is_aktif=1');

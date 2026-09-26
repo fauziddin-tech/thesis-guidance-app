@@ -1,0 +1,6 @@
+<?php
+// Tombol hapus bimbingan (tanpa dokumen bab dan tanpa pertemuan terkonfirmasi) untuk Pembimbing 1 dan admin.
+// Membutuhkan $item (baris bimbingan) dan $deleteContext ('dosen' atau 'admin').
+$deleteStudentName = (string)($item['mahasiswa_nama'] ?? $item['nama_lengkap'] ?? 'mahasiswa');
+?>
+<details class="delete-guidance"><summary class="link-button">Hapus bimbingan</summary><form method="post" data-confirm-title="Hapus bimbingan ini?" data-confirm="Bimbingan <?=h($deleteStudentName)?> dengan judul &quot;<?=h($item['judul_skripsi'])?>&quot; akan dihapus. Akun mahasiswa ikut dihapus bila tidak memiliki bimbingan lain. Gunakan untuk akun ganda atau data yang salah. Tindakan ini tidak dapat dibatalkan." data-confirm-ok="Hapus"><?=csrf_field()?><input type="hidden" name="action" value="delete_guidance"><input type="hidden" name="bimbingan_id" value="<?=(int)$item['id']?>"><label for="delete-reason-<?=$deleteContext?>-<?=(int)$item['id']?>">Alasan <span class="optional-label">Opsional</span></label><textarea id="delete-reason-<?=$deleteContext?>-<?=(int)$item['id']?>" name="alasan" rows="2" maxlength="500" placeholder="Contoh: Akun ganda."></textarea><button class="btn btn-primary btn-small" type="submit">Hapus Bimbingan</button></form></details>
