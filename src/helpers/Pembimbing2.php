@@ -59,10 +59,11 @@ function p2_first_id(mysqli $db, int $bid): int {
 /** Versi terakhir tiap dokumen: ['bab' => [1..5 => baris|null], 'naskah' => baris|null]. */
 function p2_latest_documents(mysqli $db, int $bid): array {
     if(isset($GLOBALS['p2LatestCache'][$bid]))return $GLOBALS['p2LatestCache'][$bid];
-    $latest=['bab'=>array_fill(1,5,null),'naskah'=>null];
+    $latest=['bab'=>array_fill(1,5,null),'naskah'=>null,'proposal'=>null];
     $result=$db->query("SELECT id,nama_bab,versi,status FROM bab_skripsi WHERE bimbingan_id=$bid ORDER BY versi,id");
     while($result && ($row=$result->fetch_assoc())){
         if(p2_is_format_doc((string)$row['nama_bab']))$latest['naskah']=$row;
+        elseif(proposal_is_doc((string)$row['nama_bab']))$latest['proposal']=$row;
         elseif($number=chapter_number((string)$row['nama_bab']))$latest['bab'][$number]=$row;
     }
     return $GLOBALS['p2LatestCache'][$bid]=$latest;
@@ -73,14 +74,15 @@ function p2_proposal_chapters_done(mysqli $db, int $bid): int {
     foreach([1,2,3] as $number)if((p2_latest_documents($db,$bid)['bab'][$number]['status']??'')==='disetujui')$done++;
     return $done;
 }
-/** Status tahap proposal: belum | pembimbing2 (menunggu/proses naskah) | siap. */
+/** Status ringkas untuk bagian Pembimbing 2: belum | pembimbing2 | siap (siap seminar) | selesai. */
 function p2_proposal_state(mysqli $db, int $bid): string {
-    if(p2_proposal_chapters_done($db,$bid)<3)return 'belum';
-    if(!p2_second_id($db,$bid))return 'siap';
-    return (p2_latest_documents($db,$bid)['naskah']['status']??'')==='disetujui'?'siap':'pembimbing2';
+    $stage=proposal_stage($db,$bid)['tahap'];
+    if(in_array($stage,['selesai','lama'],true))return 'selesai';
+    if($stage==='siap_seminar')return 'siap';
+    return $stage==='terkunci'?'belum':'pembimbing2';
 }
 function p2_proposal_badge(mysqli $db, int $bid): string {
-    return p2_proposal_state($db,$bid)==='siap'?'<span class="tag-ready">Siap seminar proposal</span>':'';
+    return proposal_badge($db,$bid);
 }
 /** Aturan unggah naskah proposal untuk Pembimbing 2, dengan bentuk yang sama seperti chapter_upload_state(). */
 function p2_format_upload_state(mysqli $db, int $bid): array {
@@ -90,7 +92,7 @@ function p2_format_upload_state(mysqli $db, int $bid): array {
     $row=p2_latest_documents($db,$bid)['naskah'];
     if(!$row)return ['bab'=>P2_FORMAT_TARGET,'nama'=>P2_FORMAT_DOC,'versi'=>1,'alasan'=>'Gabungkan Bab 1–3 dalam satu file Word untuk diperiksa format penulisannya oleh Pembimbing 2.'];
     if($row['status']==='direvisi')return ['bab'=>P2_FORMAT_TARGET,'nama'=>P2_FORMAT_DOC,'versi'=>(int)$row['versi']+1,'alasan'=>'Unggah perbaikan naskah proposal sesuai catatan Pembimbing 2.'];
-    if($row['status']==='disetujui')return $locked('Naskah proposal sudah disetujui Pembimbing 2. Anda siap seminar proposal.');
+    if($row['status']==='disetujui')return $locked('Naskah Bab 1–3 sudah disetujui Pembimbing 2. Lanjutkan dengan mengunggah proposal penelitian lengkap.');
     return $locked('Naskah proposal versi '.(int)$row['versi'].' masih menunggu review Pembimbing 2.');
 }
 /** Dosen yang berwenang mereview: judul dan Bab 1–5 → Pembimbing 1; naskah proposal → Pembimbing 2. */
@@ -151,6 +153,7 @@ function p2_choose(mysqli $db, int $student, int $bid, int $lecturer): void {
         if(!$b)throw new RuntimeException('Bimbingan tidak ditemukan.');
         if($b['status']!=='aktif')throw new RuntimeException('Pembimbing 2 hanya dapat dipilih pada bimbingan yang aktif.');
         if(p2_proposal_chapters_done($db,$bid)<3)throw new RuntimeException('Pembimbing 2 dapat dipilih setelah Bab 1, 2, dan 3 disetujui Pembimbing 1.');
+        if(p2_latest_documents($db,$bid)['proposal'])throw new RuntimeException('Pembimbing 2 dipilih sebelum mengunggah proposal penelitian. Hubungi administrator bila tetap diperlukan.');
         if($db->query("SELECT dosen_id FROM mythesis_pembimbing2 WHERE bimbingan_id=$bid")->num_rows>0)throw new RuntimeException('Pembimbing 2 sudah dipilih. Hubungi administrator jika perlu diganti.');
         if((int)$b['dosen_id']===$lecturer)throw new RuntimeException('Pembimbing 1 dan Pembimbing 2 harus berbeda.');
         $s=$db->prepare("SELECT id FROM users WHERE id=? AND role='dosen'");$s->bind_param('i',$lecturer);$s->execute();$valid=$s->get_result()->num_rows>0;$s->close();
@@ -160,7 +163,7 @@ function p2_choose(mysqli $db, int $student, int $bid, int $lecturer): void {
         p2_write($db,"DELETE r FROM mythesis_review_dosen r JOIN bab_skripsi bs ON r.jenis='bab' AND r.objek_id=bs.id WHERE bs.bimbingan_id=$bid AND r.dosen_id=$lecturer AND bs.nama_bab LIKE 'Naskah Proposal%'");
         $db->commit();
         unset($GLOBALS['p2TeamCache'][$bid]);
-        $message='Anda dipilih sebagai Pembimbing 2 (format penulisan) untuk skripsi berjudul: '.$b['judul_skripsi'].'. Mahasiswa akan mengunggah naskah proposal Bab 1–3 dalam satu file untuk Anda periksa.';
+        $message='Anda dipilih sebagai Pembimbing 2 (format penulisan) untuk skripsi berjudul: '.$b['judul_skripsi'].'. Mahasiswa akan mengunggah naskah Bab 1–3 dalam satu file untuk Anda periksa format penulisannya sebelum mengunggah proposal penelitian.';
         notify_user($db,$lecturer,'bimbingan_baru',$message,'?page=dashboard#mahasiswa-bimbingan','Anda dipilih sebagai Pembimbing 2','Mahasiswa bimbingan baru (Pembimbing 2)','Lihat Mahasiswa Bimbingan');
     }catch(Throwable $e){$db->rollback();throw $e;}
 }

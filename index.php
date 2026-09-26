@@ -17,6 +17,7 @@ require_once __DIR__ . '/src/helpers/RateLimit.php';
 require_once __DIR__ . '/src/helpers/MeetingLog.php';
 require_once __DIR__ . '/src/helpers/Backup.php';
 require_once __DIR__ . '/src/helpers/StudentApproval.php';
+require_once __DIR__ . '/src/helpers/Proposal.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -226,6 +227,7 @@ function chapter_upload_state(mysqli $conn, int $guidanceId): array
     }
     for ($number = 1; $number <= 5; $number++) {
         $row = $latest[$number] ?? null;
+        if (!$row && $number === 4 && ($blocker = proposal_bab4_blocker($conn, $guidanceId)) !== '') return ['bab' => 0, 'nama' => '', 'versi' => 0, 'alasan' => $blocker];
         if (!$row) return ['bab' => $number, 'nama' => 'Bab ' . $number, 'versi' => 1, 'alasan' => 'Bab ' . $number . ' siap diunggah.'];
         if ($row['status'] === 'disetujui') continue;
         if ($row['status'] === 'direvisi') return ['bab' => $number, 'nama' => (string)$row['nama_bab'], 'versi' => $maxVersion[$number] + 1, 'alasan' => 'Unggah perbaikan ' . $row['nama_bab'] . ' sesuai catatan revisi dosen.'];
@@ -250,21 +252,36 @@ function chapter_progress_map(mysqli $conn, array $guidanceIds): array
 }
 
 /**
- * Langkah progres skripsi: Judul lalu Bab 1–5. Status tiap langkah:
- * selesai | review | revisi | terbuka (giliran berikutnya) | terkunci.
+ * Langkah progres skripsi: Judul, Bab 1–3, Proposal (bila tahap proposal aktif), Bab 4–5.
+ * Status tiap langkah: selesai | review | revisi | terbuka (giliran berikutnya) | terkunci.
+ * $proposalStage berasal dari proposal_stage(); null = tahap proposal tidak ditampilkan.
  */
-function thesis_progress_steps(array $guidance, array $chapters): array
+function thesis_progress_steps(array $guidance, array $chapters, ?array $proposalStage = null): array
 {
     $titleStatus = (string)$guidance['status'];
-    $steps = [['label' => 'Judul', 'status' => $titleStatus === 'pengajuan_judul' ? 'review' : ($titleStatus === 'revisi_judul' ? 'revisi' : 'selesai'), 'versi' => 0]];
+    $steps = [['label' => 'Judul', 'marker' => 'J', 'bab' => false, 'status' => $titleStatus === 'pengajuan_judul' ? 'review' : ($titleStatus === 'revisi_judul' ? 'revisi' : 'selesai'), 'versi' => 0]];
     $open = in_array($titleStatus, ['aktif', 'selesai'], true);
     for ($number = 1; $number <= 5; $number++) {
+        if ($number === 4 && $proposalStage !== null) {
+            $stage = $proposalStage['tahap'];
+            $status = ['selesai' => 'selesai', 'lama' => 'selesai', 'siap_seminar' => 'review', 'review' => 'review', 'revisi' => 'revisi', 'format' => 'review', 'terbuka' => 'terbuka'][$stage] ?? 'terkunci';
+            if ($stage === 'format' && strpos($proposalStage['keterangan'], 'Revisi') === 0) $status = 'revisi';
+            if ($stage === 'format' && strpos($proposalStage['keterangan'], 'Unggah') === 0) $status = 'terbuka';
+            if (!$open) $status = $status === 'selesai' ? 'selesai' : 'terkunci';
+            $steps[] = ['label' => 'Proposal', 'marker' => 'P', 'bab' => false, 'status' => $status, 'versi' => (int)$proposalStage['versi'], 'keterangan' => $status === 'terkunci' ? null : $proposalStage['keterangan']];
+            if ($status !== 'selesai') $open = false;
+        }
         $row = $chapters[$number] ?? null;
         $state = !$row ? ($open ? 'terbuka' : 'terkunci') : ['disetujui' => 'selesai', 'menunggu_review' => 'review', 'direvisi' => 'revisi'][$row['status']] ?? 'review';
         if (!$row || $state !== 'selesai') $open = false;
-        $steps[] = ['label' => 'Bab ' . $number, 'status' => $state, 'versi' => $row ? (int)$row['versi'] : 0];
+        $steps[] = ['label' => 'Bab ' . $number, 'marker' => (string)$number, 'bab' => true, 'status' => $state, 'versi' => $row ? (int)$row['versi'] : 0];
     }
     return $steps;
+}
+
+function progress_step_label(array $step): string
+{
+    return (string)($step['keterangan'] ?? '') !== '' ? (string)$step['keterangan'] : progress_status_label($step['status']);
 }
 
 function progress_status_label(string $status): string
@@ -275,9 +292,9 @@ function progress_status_label(string $status): string
 // Tampilan ringkas (titik) untuk tabel dosen/admin.
 function progress_dots(array $steps): string
 {
-    $approved = count(array_filter(array_slice($steps, 1), function ($step) {return $step['status'] === 'selesai';}));
+    $approved = count(array_filter($steps, function ($step) {return !empty($step['bab']) && $step['status'] === 'selesai';}));
     $html = '<span class="progress-dots" aria-label="Progres: ' . $approved . ' dari 5 bab disetujui">';
-    foreach ($steps as $step) $html .= '<span class="dot dot-' . h($step['status']) . '" title="' . h($step['label'] . ': ' . progress_status_label($step['status']) . ($step['versi'] > 1 ? ' (versi ' . $step['versi'] . ')' : '')) . '"></span>';
+    foreach ($steps as $step) $html .= '<span class="dot dot-' . h($step['status']) . '" title="' . h($step['label'] . ': ' . progress_step_label($step) . ($step['versi'] > 1 ? ' (versi ' . $step['versi'] . ')' : '')) . '"></span>';
     return $html . '<small>' . $approved . '/5 bab disetujui</small></span>';
 }
 
@@ -316,7 +333,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.11.0';
+const APP_VERSION = '1.12.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';

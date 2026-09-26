@@ -32,6 +32,7 @@ $migrations = [
     ['file' => '20260927_add_meeting_log.sql', 'title' => 'Log pertemuan bimbingan dan target minimal pertemuan', 'done' => meeting_ready($conn)],
     ['file' => '20260928_pembimbing2_format_review.sql', 'title' => 'Pembimbing 2 memeriksa format naskah proposal (menyelaraskan status lama)', 'done' => !p2_ready($conn) || (int)$conn->query("SELECT (SELECT COUNT(*) FROM bab_skripsi bs JOIN bimbingan b ON b.id=bs.bimbingan_id JOIN mythesis_review_dosen r ON r.jenis='bab' AND r.objek_id=bs.id AND r.dosen_id=b.dosen_id WHERE bs.status IN ('menunggu_review','direvisi') AND bs.status<>r.keputusan AND bs.nama_bab NOT LIKE 'Naskah Proposal%') + (SELECT COUNT(*) FROM bimbingan b JOIN mythesis_review_dosen r ON r.jenis='judul' AND r.objek_id=b.id AND r.dosen_id=b.dosen_id AND r.keputusan='disetujui' WHERE b.status='pengajuan_judul') AS total")->fetch_assoc()['total'] === 0],
     ['file' => '20260929_student_approval.sql', 'title' => 'Penerimaan pendaftaran mahasiswa oleh dosen pembimbing', 'done' => approval_ready($conn)],
+    ['file' => '20260930_proposal_seminar.sql', 'title' => 'Tahap proposal penelitian dan seminar proposal sebelum Bab 4', 'done' => proposal_ready($conn)],
 ];
 $pendingMigrations = count(array_filter($migrations, function ($item) {return !$item['done'];}));
 

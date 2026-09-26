@@ -205,6 +205,7 @@ table.data td.date{width:30mm;white-space:nowrap}
         <div><strong><?=$lecturerResponses?></strong><span>Tanggapan dosen (revisi &amp; persetujuan)</span></div>
         <div><strong><?=count($chapters)?></strong><span>Dokumen diunggah</span></div>
         <div><strong><?=$approvedChapters?> / <?=count($chapterSummary)?></strong><span>Bab disetujui</span></div>
+        <?php if(proposal_ready($conn)): $seminarDate=proposal_seminar_date($conn,$guidanceId); ?><div><strong><?=$seminarDate?h(tanggal_id($seminarDate)):'Belum'?></strong><span>Seminar proposal</span></div><?php endif; ?>
         <?php if($meetingReady): ?><div><strong><?=count($meetings)?> / <?=$meetingTarget?></strong><span>Pertemuan terkonfirmasi<?=count($meetings)>=$meetingTarget?' — target terpenuhi':''?></span></div><?php endif; ?>
     </div>
 
