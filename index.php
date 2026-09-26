@@ -312,7 +312,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.9.0';
+const APP_VERSION = '1.10.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';

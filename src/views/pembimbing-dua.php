@@ -1,24 +1,26 @@
-<section class="card" id="pembimbing-dua">
-<h2>Pembimbing 2</h2>
-<p>Daftar ini memuat semua dosen terdaftar kecuali Pembimbing 1. Jika dosen belum tersedia, hubungi admin untuk membuat akunnya.</p>
-<p>Pembimbing 2 dapat dipilih sejak awal. Review oleh Pembimbing 2 dibuka setelah Pembimbing 1 memberikan ACC pada dokumen atau paket yang sama.</p>
-<?php if(!p2_ready($conn)): ?>
-<p>Fitur menunggu aktivasi database oleh administrator.</p>
-<?php elseif(!$guidances): ?><p>Belum ada bimbingan. Pembimbing 2 dapat dipilih setelah bimbingan tersedia.</p>
-<?php else: foreach($guidances as $guidance): $team=p2_team($conn,(int)$guidance['id']);$second=isset($team[1])?(int)$team[1]['id']:0; ?>
-<form method="post" style="margin-bottom:1rem">
-<?=csrf_field()?>
-<input type="hidden" name="action" value="choose_second_supervisor">
-<input type="hidden" name="bimbingan_id" value="<?=(int)$guidance['id']?>">
-<strong><?=h($guidance['judul_skripsi']?:'Bimbingan skripsi')?></strong>
-<p>Pembimbing 1: <?=h($guidance['dosen_nama'])?></p>
-<label for="dosen2-<?=(int)$guidance['id']?>">Nama Pembimbing 2</label>
-<select name="dosen2_id" id="dosen2-<?=(int)$guidance['id']?>" required>
-<option value="">Pilih dosen pembimbing 2</option>
-<?php foreach($availableSecondLecturers as $lecturer): if((int)$lecturer['id']===(int)$guidance['dosen_id'])continue; ?>
-<option value="<?=(int)$lecturer['id']?>" <?=$second===(int)$lecturer['id']?'selected':''?>><?=h($lecturer['nama_lengkap'])?></option>
-<?php endforeach; ?></select>
-<small class="field-help">Saat pembimbing diganti, dosen baru perlu memberikan persetujuannya sendiri. Riwayat komentar tetap tersimpan.</small>
-<button type="submit" class="btn btn-primary">Simpan Pembimbing 2</button>
-</form>
+<?php
+// Bagian dashboard mahasiswa: Pembimbing 2 (format penulisan).
+// Dipilih setelah Bab 1–3 disetujui Pembimbing 1; memeriksa satu file naskah proposal (Bab 1–3).
+?>
+<section class="card" id="pembimbing-dua"><div class="section-heading"><span class="eyebrow">PEMBIMBING 2</span><h2>Pembimbing 2 dan Seminar Proposal</h2><p>Pembimbing 1 memeriksa substansi setiap bab. Pembimbing 2 memeriksa format penulisan naskah proposal (Bab 1–3) dalam satu file, dan baru dapat dipilih setelah Bab 1–3 disetujui Pembimbing 1. Tanpa Pembimbing 2, Anda dapat langsung mengajukan seminar proposal.</p></div>
+<?php if(!p2_ready($conn)): ?><div class="upload-lock" role="status"><strong>Belum tersedia</strong><span>Fitur menunggu aktivasi database oleh administrator.</span></div>
+<?php else: foreach($guidances as $guidance): $guidanceId=(int)$guidance['id'];$secondId=p2_second_id($conn,$guidanceId);$doneChapters=p2_proposal_chapters_done($conn,$guidanceId);$proposalState=p2_proposal_state($conn,$guidanceId);$formatDoc=p2_latest_documents($conn,$guidanceId)['naskah']; ?>
+<div class="p2-block">
+<?php if(count($guidances)>1): ?><p class="progress-title"><?=h($guidance['judul_skripsi'])?></p><?php endif; ?>
+<?php if($proposalState==='siap'): ?><div class="p2-status is-ready" role="status"><strong>Siap seminar proposal</strong><span><?=$secondId?'Bab 1–3 disetujui Pembimbing 1 dan naskah proposal disetujui Pembimbing 2.':'Bab 1–3 sudah disetujui Pembimbing 1.'?></span></div><?php endif; ?>
+<?php if($secondId): $secondName=''; foreach(p2_team($conn,$guidanceId) as $teacher) if((int)$teacher['urutan']===2) $secondName=$teacher['nama_lengkap']; ?>
+<p class="p2-line"><span>Pembimbing 1 (substansi)</span><strong><?=h($guidance['dosen_nama'])?></strong></p>
+<p class="p2-line"><span>Pembimbing 2 (format penulisan)</span><strong><?=h($secondName)?></strong></p>
+<?php if($doneChapters<3): ?><div class="upload-lock" role="status"><strong>Naskah proposal belum dapat diunggah</strong><span>Bab 1–3 yang sudah disetujui Pembimbing 1: <?=$doneChapters?> dari 3. Setelah lengkap, unggah Bab 1–3 dalam satu file untuk Pembimbing 2.</span></div>
+<?php elseif(!$formatDoc): ?><div class="upload-lock" role="status"><strong>Langkah berikutnya</strong><span>Gabungkan Bab 1–3 dalam satu file Word, lalu unggah sebagai <em><?=h(P2_FORMAT_DOC)?></em> pada bagian <a href="#unggah-bab">Unggah Bab</a>.</span></div>
+<?php else: ?><p class="p2-line"><span>Naskah proposal</span><strong>Versi <?=(int)$formatDoc['versi']?> — <?=h(['menunggu_review'=>'Menunggu review Pembimbing 2','direvisi'=>'Perlu revisi format penulisan','disetujui'=>'Disetujui Pembimbing 2'][$formatDoc['status']]??$formatDoc['status'])?></strong></p><?php endif; ?>
+<small class="field-help">Pembimbing 2 hanya dapat diganti oleh administrator.</small>
+<?php elseif($guidance['status']!=='aktif'): ?><div class="upload-lock" role="status"><strong>Belum dapat memilih Pembimbing 2</strong><span>Pembimbing 2 dipilih setelah judul disetujui dan Bab 1–3 disetujui Pembimbing 1.</span></div>
+<?php elseif($doneChapters<3): ?><div class="upload-lock" role="status"><strong>Belum dapat memilih Pembimbing 2</strong><span>Bab 1–3 yang sudah disetujui Pembimbing 1: <?=$doneChapters?> dari 3. Pilihan Pembimbing 2 terbuka setelah ketiganya disetujui.</span></div>
+<?php else: ?>
+<form method="post" data-confirm-title="Simpan Pembimbing 2?" data-confirm="Dosen yang dipilih akan memeriksa format penulisan naskah proposal (Bab 1–3) sebelum seminar proposal. Pilihan ini hanya dapat diubah oleh administrator." data-confirm-ok="Simpan Pembimbing 2"><?=csrf_field()?><input type="hidden" name="action" value="choose_second_supervisor"><input type="hidden" name="bimbingan_id" value="<?=$guidanceId?>">
+<div class="form-group"><label for="dosen2-<?=$guidanceId?>">Pembimbing 2 (opsional)</label><select name="dosen2_id" id="dosen2-<?=$guidanceId?>" required><option value="">Pilih dosen pembimbing 2</option><?php foreach($availableSecondLecturers as $lecturer): if((int)$lecturer['id']===(int)$guidance['dosen_id'])continue; ?><option value="<?=(int)$lecturer['id']?>"><?=h($lecturer['nama_lengkap'])?></option><?php endforeach; ?></select><small class="field-help">Tidak perlu memilih jika program studi Anda tidak mewajibkan Pembimbing 2. Jika dosen belum tersedia, hubungi admin.</small></div>
+<button type="submit" class="btn btn-primary">Simpan Pembimbing 2</button></form>
+<?php endif; ?>
+</div>
 <?php endforeach; endif; ?></section>
