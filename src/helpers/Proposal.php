@@ -5,7 +5,7 @@
  *   → (bila ada Pembimbing 2) naskah Bab 1–3 diperiksa format penulisannya oleh Pembimbing 2
  *   → mahasiswa mengunggah "Proposal Penelitian" (Bab 1–3 lengkap + instrumen penelitian), direview Pembimbing 1
  *   → proposal disetujui = siap seminar proposal
- *   → Pembimbing 1/admin menandai seminar proposal selesai → Bab 4 terbuka.
+ *   → Pembimbing 1 menandai seminar proposal selesai → Bab 4 terbuka (hanya dosen, bukan admin).
  * Bimbingan lama yang sudah mengunggah Bab 4 sebelum aturan ini tetap berjalan seperti biasa.
  */
 const PROPOSAL_DOC = 'Proposal Penelitian';
@@ -93,15 +93,14 @@ function proposal_badge(mysqli $db, int $guidanceId): string
     return '';
 }
 
-/** Pembimbing 1 atau admin menandai seminar proposal selesai. */
+/** Hanya Pembimbing 1 yang dapat menandai seminar proposal selesai. */
 function proposal_mark_seminar(mysqli $db, array $actor, int $guidanceId, string $date): void
 {
     if (!proposal_ready($db)) throw new RuntimeException('Tahap proposal belum diaktifkan.');
     $stmt = $db->prepare('SELECT b.id,b.dosen_id,b.mahasiswa_id,b.seminar_proposal_at FROM bimbingan b WHERE b.id=? LIMIT 1');
     $stmt->bind_param('i', $guidanceId);$stmt->execute();$guidance = $stmt->get_result()->fetch_assoc();$stmt->close();
     if (!$guidance) throw new RuntimeException('Bimbingan tidak ditemukan.');
-    if ($actor['role'] === 'dosen' && (int)$guidance['dosen_id'] !== (int)$actor['id']) throw new RuntimeException('Hanya Pembimbing 1 yang dapat menandai seminar proposal.');
-    if (!in_array($actor['role'], ['dosen', 'admin'], true)) throw new RuntimeException('Tindakan tidak diizinkan.');
+    if ($actor['role'] !== 'dosen' || (int)$guidance['dosen_id'] !== (int)$actor['id']) throw new RuntimeException('Hanya Pembimbing 1 yang dapat menandai seminar proposal.');
     if ($guidance['seminar_proposal_at']) throw new RuntimeException('Seminar proposal sudah ditandai selesai.');
     if (proposal_stage($db, $guidanceId)['tahap'] !== 'siap_seminar') throw new RuntimeException('Seminar proposal dapat ditandai setelah proposal penelitian disetujui Pembimbing 1.');
     $parsed = DateTime::createFromFormat('!Y-m-d', $date);
@@ -113,10 +112,12 @@ function proposal_mark_seminar(mysqli $db, array $actor, int $guidanceId, string
         '?page=dashboard#unggah-bab', 'Seminar proposal selesai, Bab 4 terbuka', 'Seminar proposal selesai', 'Unggah Bab 4');
 }
 
-/** Admin membatalkan tanda seminar (salah input), selama Bab 4 belum diunggah. */
-function proposal_unmark_seminar(mysqli $db, int $guidanceId): void
+/** Pembimbing 1 membatalkan tanda seminar (salah input), selama Bab 4 belum diunggah. */
+function proposal_unmark_seminar(mysqli $db, int $lecturerId, int $guidanceId): void
 {
     if (!proposal_ready($db)) throw new RuntimeException('Tahap proposal belum diaktifkan.');
+    $row = $db->query('SELECT dosen_id FROM bimbingan WHERE id=' . $guidanceId)->fetch_assoc();
+    if (!$row || (int)$row['dosen_id'] !== $lecturerId) throw new RuntimeException('Hanya Pembimbing 1 yang dapat membatalkan tanda seminar proposal.');
     if (p2_latest_documents($db, $guidanceId)['bab'][4]) throw new RuntimeException('Bab 4 sudah diunggah, sehingga tanda seminar tidak dapat dibatalkan.');
     $db->query('UPDATE bimbingan SET seminar_proposal_at=NULL WHERE id=' . $guidanceId);
     unset($GLOBALS['proposalSeminarCache'][$guidanceId]);
