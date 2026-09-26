@@ -122,3 +122,115 @@ function proposal_unmark_seminar(mysqli $db, int $lecturerId, int $guidanceId): 
     $db->query('UPDATE bimbingan SET seminar_proposal_at=NULL WHERE id=' . $guidanceId);
     unset($GLOBALS['proposalSeminarCache'][$guidanceId]);
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * Kelengkapan dan tata tulis proposal (kolom bab_skripsi.kelengkapan, migrasi 20261001_proposal_checklist.sql).
+ * - Mahasiswa mencentang setiap komponen sebelum mengunggah proposal.
+ * - Sistem memindai file DOCX dan mencatat judul bagian yang ditemukan (hanya sebagai bantuan).
+ * - Pembimbing 1 menilai setiap komponen (Sesuai / Perlu perbaikan) sebelum menyetujui; proposal
+ *   hanya dapat disetujui bila semua komponen Sesuai. Komponen yang perlu diperbaiki ikut tertulis
+ *   di catatan revisi.
+ * ------------------------------------------------------------------------------------------- */
+const PROPOSAL_COMPONENTS = [
+    'cover' => 'Cover (halaman judul)',
+    'kata_pengantar' => 'Kata Pengantar',
+    'daftar_isi' => 'Daftar Isi',
+    'daftar_tabel' => 'Daftar Tabel',
+    'daftar_gambar' => 'Daftar Gambar',
+    'bab1' => 'Bab I Pendahuluan',
+    'bab2' => 'Bab II Kajian Pustaka',
+    'bab3' => 'Bab III Metode Penelitian',
+    'daftar_pustaka' => 'Daftar Pustaka',
+    'lampiran' => 'Lampiran (instrumen penelitian)',
+];
+// Bantuan untuk mahasiswa: keterangan singkat tiap komponen di formulir unggah.
+const PROPOSAL_COMPONENT_HINTS = [
+    'daftar_tabel' => 'Centang juga bila proposal memang tidak memuat tabel.',
+    'daftar_gambar' => 'Centang juga bila proposal memang tidak memuat gambar.',
+    'lampiran' => 'Minimal kisi-kisi dan instrumen penelitian.',
+];
+
+function proposal_checklist_ready(mysqli $db): bool
+{
+    static $ready = null;
+    if ($ready === null) $ready = column_exists($db, 'bab_skripsi', 'kelengkapan');
+    return $ready;
+}
+
+/** Memindai judul bagian di file DOCX. Hasil: [komponen => true|false|null]; null = tidak dapat diperiksa otomatis. */
+function proposal_scan_docx(string $path): array
+{
+    $result = array_fill_keys(array_keys(PROPOSAL_COMPONENTS), null);
+    if (!class_exists('ZipArchive')) return $result;
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) return $result;
+    $xml = (string)$zip->getFromName('word/document.xml');
+    $zip->close();
+    if ($xml === '') return $result;
+    $text = preg_replace(['/<\/w:p>/', '/<w:tab\/>/', '/<[^>]+>/'], ["\n", ' ', ''], $xml);
+    $text = mb_strtoupper(html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8'));
+    $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
+    $patterns = [
+        'kata_pengantar' => '/KATA\s+PENGANTAR/u',
+        'daftar_isi' => '/DAFTAR\s+ISI/u',
+        'daftar_tabel' => '/DAFTAR\s+TABEL/u',
+        'daftar_gambar' => '/DAFTAR\s+GAMBAR/u',
+        'bab1' => '/\bBAB\s+(I|1)\b/u',
+        'bab2' => '/\bBAB\s+(II|2)\b/u',
+        'bab3' => '/\bBAB\s+(III|3)\b/u',
+        'daftar_pustaka' => '/DAFTAR\s+PUSTAKA|DAFTAR\s+REFERENSI|DAFTAR\s+RUJUKAN|BIBLIOGRAFI/u',
+        'lampiran' => '/\bLAMPIRAN\b/u',
+    ];
+    foreach ($patterns as $key => $pattern) $result[$key] = preg_match($pattern, $text) === 1;
+    return $result; // cover tidak dapat dikenali otomatis (tetap null)
+}
+
+function proposal_checklist_get(mysqli $db, int $documentId): array
+{
+    if (!proposal_checklist_ready($db)) return [];
+    $row = $db->query('SELECT kelengkapan FROM bab_skripsi WHERE id=' . $documentId)->fetch_assoc();
+    $data = json_decode((string)($row['kelengkapan'] ?? ''), true);
+    return is_array($data) ? $data : [];
+}
+
+function proposal_checklist_decode($raw): array
+{
+    $data = json_decode((string)$raw, true);
+    return is_array($data) ? $data : [];
+}
+
+function proposal_checklist_put(mysqli $db, int $documentId, array $data): void
+{
+    if (!proposal_checklist_ready($db)) return;
+    $json = json_encode($data, JSON_UNESCAPED_UNICODE);
+    $stmt = $db->prepare('UPDATE bab_skripsi SET kelengkapan=? WHERE id=?');
+    $stmt->bind_param('si', $json, $documentId);$stmt->execute();$stmt->close();
+}
+
+/** Komponen yang belum dicentang mahasiswa. */
+function proposal_missing_student_ticks(array $ticked): array
+{
+    return array_values(array_diff(array_keys(PROPOSAL_COMPONENTS), $ticked));
+}
+
+/** Label komponen dengan hasil pemeriksaan dosen tertentu. */
+function proposal_components_with(array $checklist, string $result): array
+{
+    $labels = [];
+    foreach (PROPOSAL_COMPONENTS as $key => $label) if (($checklist['dosen']['hasil'][$key] ?? '') === $result) $labels[] = $label;
+    return $labels;
+}
+
+/** Komponen yang tidak ditemukan pemindaian otomatis. */
+function proposal_components_not_found(array $checklist): array
+{
+    $labels = [];
+    foreach (PROPOSAL_COMPONENTS as $key => $label) if (($checklist['otomatis'][$key] ?? null) === false) $labels[] = $label;
+    return $labels;
+}
+
+function proposal_checklist_complete(array $checklist): bool
+{
+    foreach (array_keys(PROPOSAL_COMPONENTS) as $key) if (($checklist['dosen']['hasil'][$key] ?? '') !== 'sesuai') return false;
+    return true;
+}

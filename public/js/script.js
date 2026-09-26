@@ -44,3 +44,5 @@ document.addEventListener('DOMContentLoaded',()=>{
   const studentSelect=document.getElementById('data_mahasiswa_id');
   if(studentSelect){studentSelect.addEventListener('change',()=>{const option=studentSelect.selectedOptions[0];if(!option)return;const nim=document.getElementById('data_nim');const prodi=document.getElementById('data_prodi');const angkatan=document.getElementById('data_angkatan');if(nim)nim.value=option.dataset.nim||'';if(prodi)prodi.value=option.dataset.prodi&&option.dataset.prodi!=='0'?option.dataset.prodi:'';if(angkatan)angkatan.value=option.dataset.angkatan&&option.dataset.angkatan!=='0'?option.dataset.angkatan:''})}
 });
+// Formulir unggah: tampilkan daftar kelengkapan hanya saat Proposal Penelitian dipilih.
+(()=>{const select=document.getElementById('unggah_target');const box=document.querySelector('[data-proposal-checklist]');if(!select||!box)return;const sync=()=>{const on=select.value.endsWith(':91');box.hidden=!on;box.querySelectorAll('input[type=checkbox]').forEach(input=>{input.disabled=!on;input.required=on;});};select.addEventListener('change',sync);sync();})();

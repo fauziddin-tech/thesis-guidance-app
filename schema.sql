@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS bab_skripsi (
     file_path VARCHAR(255) NOT NULL,
     versi INT DEFAULT 1,
     status ENUM('draft', 'menunggu_review', 'direvisi', 'disetujui') DEFAULT 'draft',
+    kelengkapan TEXT NULL,
     disetujui_at TIMESTAMP NULL DEFAULT NULL,
     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (bimbingan_id) REFERENCES bimbingan(id) ON DELETE CASCADE
