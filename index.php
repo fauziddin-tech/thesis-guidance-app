@@ -18,6 +18,7 @@ require_once __DIR__ . '/src/helpers/MeetingLog.php';
 require_once __DIR__ . '/src/helpers/Backup.php';
 require_once __DIR__ . '/src/helpers/StudentApproval.php';
 require_once __DIR__ . '/src/helpers/Proposal.php';
+require_once __DIR__ . '/src/helpers/Examples.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -333,7 +334,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.13.0';
+const APP_VERSION = '1.14.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';
@@ -432,6 +433,23 @@ if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
     header('Content-Length: ' . filesize($avatarPath));
     header('Cache-Control: ' . ($isPublicLecturer ? 'public' : 'private') . ', max-age=3600');
     readfile($avatarPath);
+    exit;
+}
+
+// Contoh dokumen PDF: ditampilkan di pratinjau (inline) atau diunduh (&unduh=1) oleh pengguna yang berhak.
+if (isset($_GET['action']) && $_GET['action'] === 'contoh') {
+    if (!isset($_SESSION['user'])) {http_response_code(401);exit('Silakan masuk untuk melihat contoh dokumen.');}
+    $example = examples_find($conn, (int)($_GET['id'] ?? 0));
+    if (!$example || !examples_can_view($conn, $_SESSION['user'], $example)) {http_response_code(404);exit('Contoh dokumen tidak ditemukan.');}
+    $examplePath = realpath(__DIR__ . '/' . $example['file_path']);
+    if (!$examplePath || strpos($examplePath, realpath(examples_dir()) ?: '/nonexistent') !== 0 || !is_file($examplePath)) {http_response_code(404);exit('File contoh tidak tersedia.');}
+    $exampleName = trim(preg_replace('/[^A-Za-z0-9 _.-]+/', '', $example['judul'])) ?: 'contoh';
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Length: ' . filesize($examplePath));
+    header('Content-Disposition: ' . (isset($_GET['unduh']) ? 'attachment' : 'inline') . '; filename="' . $exampleName . '.pdf"');
+    header('Cache-Control: private, max-age=600');
+    readfile($examplePath);
     exit;
 }
 

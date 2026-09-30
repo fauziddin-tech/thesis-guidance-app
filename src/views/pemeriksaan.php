@@ -34,6 +34,7 @@ $migrations = [
     ['file' => '20260929_student_approval.sql', 'title' => 'Penerimaan pendaftaran mahasiswa oleh dosen pembimbing', 'done' => approval_ready($conn)],
     ['file' => '20260930_proposal_seminar.sql', 'title' => 'Tahap proposal penelitian dan seminar proposal sebelum Bab 4', 'done' => proposal_ready($conn)],
     ['file' => '20261001_proposal_checklist.sql', 'title' => 'Pemeriksaan kelengkapan dan tata tulis proposal', 'done' => proposal_checklist_ready($conn)],
+    ['file' => '20261002_contoh_dokumen.sql', 'title' => 'Contoh dokumen PDF dari dosen untuk mahasiswa', 'done' => examples_ready($conn)],
 ];
 $pendingMigrations = count(array_filter($migrations, function ($item) {return !$item['done'];}));
 

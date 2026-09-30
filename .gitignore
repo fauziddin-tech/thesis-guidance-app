@@ -14,3 +14,6 @@ error_log
 /storage/access-audit/
 /config/.htaccess
 /src/.htaccess
+/storage/examples/*
+!/storage/examples/.htaccess
+!/storage/examples/index.html

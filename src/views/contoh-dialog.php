@@ -1,0 +1,4 @@
+<?php // Popup pratinjau contoh dokumen PDF (dipakai semua peran). ?>
+<dialog class="dashboard-dialog example-dialog" id="example-dialog" aria-labelledby="example-dialog-title"><div class="dialog-head"><div><span class="eyebrow">CONTOH DOKUMEN</span><h2 id="example-dialog-title">Pratinjau</h2></div><button class="dialog-close" type="button" data-example-close aria-label="Tutup pratinjau">×</button></div>
+<div class="example-frame"><iframe title="Pratinjau contoh dokumen" data-example-frame></iframe></div>
+<div class="example-dialog-actions"><small class="field-help">Pratinjau tidak tampil di sebagian browser HP. Gunakan tombol di samping bila halaman kosong.</small><a class="btn btn-secondary btn-small" data-example-newtab target="_blank" rel="noopener">Buka di tab baru</a><a class="btn btn-primary btn-small" data-example-download>Unduh PDF</a></div></dialog>
