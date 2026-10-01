@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('admin', 'dosen', 'mahasiswa') NOT NULL,
+    is_aktif TINYINT(1) NOT NULL DEFAULT 1,
     nama_lengkap VARCHAR(150) NOT NULL,
     nim VARCHAR(30) NULL,
     prodi_id INT NULL,

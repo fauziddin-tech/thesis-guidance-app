@@ -1,5 +1,5 @@
 <?php
-$loginError='';
+$loginError='';if(!empty($_SESSION['flash']['type'])&&$_SESSION['flash']['type']==='danger'&&$_SERVER['REQUEST_METHOD']!=='POST'){$loginError=(string)$_SESSION['flash']['message'];unset($_SESSION['flash']);}
 if($_SERVER['REQUEST_METHOD']==='POST'){
     $identity=trim($_POST['username']??'');$password=$_POST['password']??'';
     // Batas: 5 percobaan gagal per akun dan 20 per alamat IP dalam 15 menit.
@@ -9,8 +9,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     else{
         $stmt=$conn->prepare('SELECT * FROM users WHERE username=? OR email=? ORDER BY (email=?) DESC LIMIT 1');$stmt->bind_param('sss',$identity,$identity,$identity);$stmt->execute();$account=$stmt->get_result()->fetch_assoc();$stmt->close();
         if(!$account||!password_verify($password,$account['password'])){rl_hit($conn,'login',$rateKeyAccount);rl_hit($conn,'login_ip',$rateKeyIp);}
-        if($account&&password_verify($password,$account['password'])){unset($account['password']);session_regenerate_id(true);$_SESSION['user']=$account;unset($_SESSION['csrf_token']);header('Location: ?page=dashboard');exit;}
-        $loginError='Username, email, atau password tidak sesuai.';
+        if($account&&password_verify($password,$account['password'])&&isset($account['is_aktif'])&&(int)$account['is_aktif']===0){$loginError='Akun Anda tidak aktif. Hubungi administrator.';}
+        elseif($account&&password_verify($password,$account['password'])){unset($account['password']);session_regenerate_id(true);$_SESSION['user']=$account;unset($_SESSION['csrf_token']);header('Location: ?page=dashboard');exit;}
+        if($loginError==='')$loginError='Username, email, atau password tidak sesuai.';
     }
 }
 ?>

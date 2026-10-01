@@ -2,7 +2,7 @@
 <?php
 $homeLecturers = [];
 if (column_exists($conn, 'users', 'tampil_beranda')) {
-    $lecturerResult = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen' AND tampil_beranda=1 ORDER BY nama_lengkap");
+    $lecturerResult = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen' AND tampil_beranda=1".user_active_sql($conn)." ORDER BY nama_lengkap");
     $homeLecturers = $lecturerResult ? $lecturerResult->fetch_all(MYSQLI_ASSOC) : [];
 }
 if ($homeLecturers): ?>
