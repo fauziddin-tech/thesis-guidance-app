@@ -19,6 +19,7 @@ require_once __DIR__ . '/src/helpers/Backup.php';
 require_once __DIR__ . '/src/helpers/StudentApproval.php';
 require_once __DIR__ . '/src/helpers/Proposal.php';
 require_once __DIR__ . '/src/helpers/Examples.php';
+require_once __DIR__ . '/src/helpers/UserAdmin.php';
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -116,7 +117,7 @@ function app_base_url(): string
 
 function lecturer_options(mysqli $conn): array
 {
-    $result = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen' ORDER BY nama_lengkap");
+    $result = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen'" . user_active_sql($conn) . ' ORDER BY nama_lengkap');
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
@@ -541,6 +542,14 @@ if ($page === 'verifikasi') {
     exit;
 }
 
+// Akun yang dihapus atau dinonaktifkan administrator langsung dikeluarkan dari sesi yang sedang berjalan.
+if (isset($_SESSION['user']) && empty($_SESSION['student_preview']) && !user_is_active($conn, (int)$_SESSION['user']['id'])) {
+    unset($_SESSION['user']);
+    session_regenerate_id(true);
+    $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Akun Anda tidak aktif atau telah dihapus. Hubungi administrator.'];
+    header('Location: ?page=login');
+    exit;
+}
 if (!in_array($page, $allowedPages, true)) $page = 'home';
 if (in_array($page, ['dashboard', 'pemeriksaan', 'notifikasi'], true) && !isset($_SESSION['user'])) {
     header('Location: ?page=login');
