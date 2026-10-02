@@ -140,12 +140,15 @@ function lecturer_delete(mysqli $db, int $lecturerId): string
     return $lecturer['nama_lengkap'];
 }
 
-/** Hapus permanen akun mahasiswa beserta seluruh bimbingan, dokumen, revisi, dan filenya. */
+/** Hapus permanen akun mahasiswa yang tidak memiliki bimbingan (akun ganda atau yang sudah dilepas). */
 function student_delete(mysqli $db, int $studentId): string
 {
     $stmt = $db->prepare("SELECT id,nama_lengkap FROM users WHERE id=? AND role='mahasiswa' LIMIT 1");
     $stmt->bind_param('i', $studentId);$stmt->execute();$student = $stmt->get_result()->fetch_assoc();$stmt->close();
     if (!$student) throw new RuntimeException('Mahasiswa tidak ditemukan.');
+    $stmt = $db->prepare('SELECT COUNT(*) FROM bimbingan WHERE mahasiswa_id=?');
+    $stmt->bind_param('i', $studentId);$stmt->execute();$guidanceTotal = (int)$stmt->get_result()->fetch_row()[0];$stmt->close();
+    if ($guidanceTotal > 0) throw new RuntimeException($student['nama_lengkap'] . ' masih memiliki bimbingan (aktif atau arsip) sehingga tidak dapat dihapus.');
     $files = [];
     $db->begin_transaction();
     try {
