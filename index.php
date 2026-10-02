@@ -188,9 +188,9 @@ function valid_thesis_title(string $title): bool
 }
 
 // Alat paginasi seragam (cari + 10/20/50 per halaman). Dipakai bersama atribut data-paginate di public/js/script.js.
-function paginate_tools(string $id, string $placeholder, string $noun, string $extraControls = ''): string
+function paginate_tools(string $id, string $placeholder, string $noun): string
 {
-    return '<div class="student-list-tools"><div class="student-search"><label class="sr-only" for="' . h($id) . '">Cari ' . h($noun) . '</label><input id="' . h($id) . '" type="search" placeholder="' . h($placeholder) . '" data-paginate-search></div>' . $extraControls
+    return '<div class="student-list-tools"><div class="student-search"><label class="sr-only" for="' . h($id) . '">Cari ' . h($noun) . '</label><input id="' . h($id) . '" type="search" placeholder="' . h($placeholder) . '" data-paginate-search></div>'
         . '<label class="student-page-size">Tampilkan <select data-paginate-size aria-label="Jumlah ' . h($noun) . ' per halaman"><option value="10" selected>10</option><option value="20">20</option><option value="50">50</option></select> per halaman</label></div>';
 }
 

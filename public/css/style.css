@@ -98,4 +98,3 @@
 
 .release-actions{display:flex;flex-direction:column;align-items:flex-start;gap:6px;margin-top:8px}.release-actions form{margin:0}.release-actions .inline-form{display:flex;flex-wrap:wrap;gap:6px}.release-actions select{max-width:220px}
 .bulk-release{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 12px}
-.student-owner-filter{margin:0;min-width:220px;flex:1 1 220px}.student-owner-filter select{width:100%}
