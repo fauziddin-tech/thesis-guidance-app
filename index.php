@@ -117,7 +117,7 @@ function app_base_url(): string
 
 function lecturer_options(mysqli $conn): array
 {
-    $result = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen'" . user_active_sql($conn) . ' ORDER BY nama_lengkap');
+    $result = $conn->query("SELECT id,nama_lengkap FROM users WHERE role='dosen'" . user_active_sql($conn) . ' ORDER BY ' . lecturer_sort_sql($conn));
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
