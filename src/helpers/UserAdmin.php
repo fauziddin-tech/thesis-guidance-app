@@ -6,7 +6,7 @@
  *   Ditangguhkan, peran Pembimbing 2 dilepas, dan mahasiswa diberi notifikasi. Dokumen serta riwayat
  *   review tetap tersimpan. Admin kemudian memindahkan bimbingan ke dosen aktif lain.
  *   Hapus hanya untuk akun dosen yang belum pernah terlibat bimbingan (mis. akun salah ketik).
- * - Mahasiswa: Hapus permanen beserta seluruh bimbingan, dokumen, dan filenya.
+ * - Mahasiswa: Hapus permanen hanya untuk akun tanpa bimbingan; yang sudah selesai tetap tersimpan di Arsip.
  * Fungsi pembaca aman dipanggil sebelum migrasi dijalankan.
  */
 
