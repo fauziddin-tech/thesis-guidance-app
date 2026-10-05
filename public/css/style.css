@@ -95,3 +95,22 @@
 .dialog-table-wrap .proposal-review-table{table-layout:auto}.dialog-table-wrap .proposal-review-table th,.dialog-table-wrap .proposal-review-table td{width:auto;padding:4px 6px}.dialog-table-wrap .proposal-review-table th:nth-child(n+2),.dialog-table-wrap .proposal-review-table td:nth-child(n+2){width:46px}.dialog-table-wrap tr:has(.proposal-review)>td{vertical-align:top}.proposal-checklist legend{float:none;width:auto;border:0}
 .example-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}.example-card{display:flex;flex-direction:column;gap:6px;padding:16px;border:1px solid var(--line);border-radius:11px;background:var(--surface)}.example-card h3{margin:0;font-size:16px;line-height:1.35}.example-card p{margin:0;color:var(--muted);font-size:13px}.example-type{align-self:flex-start;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent);font-size:11px;font-weight:700}.example-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:8px}
 .example-dialog{width:min(1100px,96vw);max-width:none}.example-frame{height:min(66vh,860px);border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#525659}.example-frame iframe{width:100%;height:100%;border:0;display:block}.example-dialog-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px;margin-top:12px}.example-dialog-actions .field-help{margin-right:auto}.danger-link{color:var(--danger)}
+
+/* Layar pendek (laptop 1366×768 / 1280×720, zoom Windows 125–150%): popup tidak boleh melebihi layar dan tombol kirim selalu terlihat. */
+.dashboard-dialog{max-height:min(90vh,760px);max-height:min(90dvh,760px)}
+.revision-dialog,.profile-edit-dialog{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px);overflow:hidden}
+.revision-dialog[open],.profile-edit-dialog[open]{display:flex;flex-direction:column}
+.revision-dialog .dialog-head,.profile-edit-dialog .dialog-head{flex:0 0 auto}
+.revision-dialog>form,.profile-edit-dialog>form{flex:1 1 auto;min-height:0;margin:0 -6px;padding:3px 6px 0;overflow-y:auto;overscroll-behavior:contain}
+.revision-dialog .dialog-actions,.profile-edit-dialog .dialog-actions{position:sticky;z-index:2;bottom:0;margin-top:14px;padding:12px 0 2px;border-top:1px solid var(--line);background:var(--surface)}
+.example-dialog[open]{display:flex;flex-direction:column}
+.example-dialog .dialog-head,.example-dialog-actions{flex:0 0 auto}
+.example-frame{flex:1 1 auto;min-height:160px}
+@media(max-width:900px){.profile-popover{max-height:calc(100vh - 130px);max-height:calc(100dvh - 130px);overflow-y:auto}}
+@media(max-height:720px){.dashboard-dialog{padding:16px 20px}
+.dialog-head,.revision-dialog .dialog-head{gap:14px;margin-bottom:12px;padding-bottom:10px}
+.dialog-head h2{font-size:20px}
+.dashboard-dialog .form-group{margin-bottom:10px}
+.revision-dialog textarea{height:64px;min-height:64px}
+.profile-security{margin-top:12px;padding:12px 14px}
+.dialog-table-wrap{max-height:48vh}}
