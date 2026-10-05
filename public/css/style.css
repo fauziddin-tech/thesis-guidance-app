@@ -122,3 +122,8 @@
 .revision-dialog textarea{height:64px;min-height:64px}
 .profile-security{margin-top:12px;padding:12px 14px}
 .dialog-table-wrap{max-height:48vh}}
+
+/* Tab tahap bimbingan: Aktif, Seminar Proposal, Seminar Hasil, Arsip. */
+.list-tabs{overflow-x:auto;scrollbar-width:thin}
+.list-tabs a{flex:0 0 auto;white-space:nowrap}
+.tab-pending{width:8px;height:8px;margin-left:-3px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px var(--surface)}

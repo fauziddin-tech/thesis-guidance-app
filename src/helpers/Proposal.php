@@ -74,6 +74,43 @@ function proposal_upload_state(mysqli $db, int $guidanceId): array
     }
 }
 
+/**
+ * Tab daftar bimbingan dosen/admin menurut tahap skripsi, dihitung dengan dua kueri untuk seluruh daftar:
+ * aktif | seminar_proposal (proposal disetujui, termasuk setelah seminar dan selama Bab 4–5)
+ * | seminar_hasil (Bab 5 disetujui) | arsip (bimbingan selesai). Mengembalikan [bimbingan_id => tab].
+ */
+function guidance_stage_tabs(mysqli $db, array $guidances): array
+{
+    $tabs = [];$ids = [];
+    foreach ($guidances as $item) {
+        $id = (int)$item['id'];
+        $tabs[$id] = ($item['status'] ?? '') === 'selesai' ? 'arsip' : 'aktif';
+        if ($tabs[$id] === 'aktif') $ids[] = $id;
+    }
+    if (!$ids) return $tabs;
+    $latest = [];
+    $result = $db->query('SELECT bimbingan_id,nama_bab,status FROM bab_skripsi WHERE bimbingan_id IN (' . implode(',', $ids) . ') ORDER BY versi,id');
+    while ($result && ($row = $result->fetch_assoc())) {
+        $name = (string)$row['nama_bab'];
+        if (p2_is_format_doc($name)) continue;
+        $key = proposal_is_doc($name) ? 'proposal' : 'bab' . chapter_number($name);
+        if ($key !== 'bab0') $latest[(int)$row['bimbingan_id']][$key] = (string)$row['status'];
+    }
+    $seminarDone = [];
+    if (proposal_ready($db)) {
+        $result = $db->query('SELECT id FROM bimbingan WHERE seminar_proposal_at IS NOT NULL AND id IN (' . implode(',', $ids) . ')');
+        while ($result && ($row = $result->fetch_assoc())) $seminarDone[(int)$row['id']] = true;
+    }
+    foreach ($ids as $id) {
+        $docs = $latest[$id] ?? [];
+        // Bimbingan lama yang sudah masuk Bab 4 sebelum tahap proposal diberlakukan dianggap sudah melewati proposal.
+        $pastProposal = !empty($seminarDone[$id]) || ($docs['proposal'] ?? '') === 'disetujui' || (!isset($docs['proposal']) && (isset($docs['bab4']) || isset($docs['bab5'])));
+        if (($docs['bab5'] ?? '') === 'disetujui') $tabs[$id] = 'seminar_hasil';
+        elseif ($pastProposal) $tabs[$id] = 'seminar_proposal';
+    }
+    return $tabs;
+}
+
 /** Bab 4 hanya terbuka setelah seminar proposal selesai (kecuali bimbingan lama yang sudah memulai Bab 4). */
 function proposal_bab4_blocker(mysqli $db, int $guidanceId): string
 {
