@@ -121,7 +121,7 @@ function guidance_deletable_ids(mysqli $db, array $guidanceIds): array
  * Dosen hanya dapat menghapus bimbingan tempat ia menjadi Pembimbing 1. Akun mahasiswa ikut dihapus
  * bila tidak memiliki bimbingan lain. Mengembalikan ['akun_dihapus' => bool, 'mahasiswa' => nama].
  */
-function guidance_delete(mysqli $db, int $guidanceId, array $actor, string $reason = '', bool $isRejection = false): array
+function guidance_delete(mysqli $db, int $guidanceId, array $actor, string $reason = '', bool $isRejection = false, bool $isRelease = false): array
 {
     $stmt = $db->prepare('SELECT b.*,u.nama_lengkap AS mahasiswa_nama,u.email AS mahasiswa_email FROM bimbingan b JOIN users u ON u.id=b.mahasiswa_id WHERE b.id=? LIMIT 1');
     $stmt->bind_param('i', $guidanceId);$stmt->execute();$guidance = $stmt->get_result()->fetch_assoc();$stmt->close();
@@ -134,12 +134,14 @@ function guidance_delete(mysqli $db, int $guidanceId, array $actor, string $reas
     $studentId = (int)$guidance['mahasiswa_id'];
 
     // Beritahu mahasiswa lebih dulu (email tetap terkirim walaupun akunnya ikut dihapus).
-    $body = $isRejection
+    $body = $isRelease
+        ? 'Anda dilepas dari bimbingan skripsi dengan judul "' . $guidance['judul_skripsi'] . '" karena dosen pembimbing tidak lagi aktif. Akun Anda tetap ada; silakan pilih dosen pembimbing baru dari dashboard.'
+        : ($isRejection
         ? 'Pendaftaran bimbingan skripsi Anda dengan judul "' . $guidance['judul_skripsi'] . '" tidak diterima oleh dosen pembimbing.'
-        : 'Bimbingan skripsi dengan judul "' . $guidance['judul_skripsi'] . '" dihapus oleh ' . ($actor['role'] === 'admin' ? 'administrator' : 'dosen pembimbing') . '.';
+        : 'Bimbingan skripsi dengan judul "' . $guidance['judul_skripsi'] . '" dihapus oleh ' . ($actor['role'] === 'admin' ? 'administrator' : 'dosen pembimbing') . '.');
     if ($reason !== '') $body .= "\n\nAlasan: " . $reason;
-    $body .= "\n\nJika ini keliru, hubungi dosen pembimbing atau administrator program studi.";
-    notify_user($db, $studentId, 'bimbingan_baru', $body, '?page=dashboard', $isRejection ? 'Pendaftaran bimbingan tidak diterima' : 'Bimbingan skripsi dihapus', $isRejection ? 'Pendaftaran bimbingan tidak diterima' : 'Bimbingan skripsi dihapus', 'Buka MyThesis');
+    if (!$isRelease) $body .= "\n\nJika ini keliru, hubungi dosen pembimbing atau administrator program studi.";
+    notify_user($db, $studentId, 'bimbingan_baru', $body, '?page=dashboard', $isRelease ? 'Anda dilepas dari dosen pembimbing' : ($isRejection ? 'Pendaftaran bimbingan tidak diterima' : 'Bimbingan skripsi dihapus'), $isRelease ? 'Dosen pembimbing Anda tidak lagi aktif' : ($isRejection ? 'Pendaftaran bimbingan tidak diterima' : 'Bimbingan skripsi dihapus'), 'Buka MyThesis');
 
     $db->begin_transaction();
     try {
@@ -151,7 +153,7 @@ function guidance_delete(mysqli $db, int $guidanceId, array $actor, string $reas
         $run("DELETE FROM bimbingan WHERE id=$guidanceId");
         $remaining = (int)$db->query("SELECT COUNT(*) AS total FROM bimbingan WHERE mahasiswa_id=$studentId")->fetch_assoc()['total'];
         $accountDeleted = false;
-        if ($remaining === 0) {
+        if ($remaining === 0 && !$isRelease) {
             foreach (['notifikasi' => 'user_id', 'password_resets' => 'user_id'] as $table => $column) {
                 if (approval_table_exists($db, $table)) $run("DELETE FROM `$table` WHERE `$column`=$studentId");
             }

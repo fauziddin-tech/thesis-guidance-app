@@ -6,7 +6,7 @@
  *   Ditangguhkan, peran Pembimbing 2 dilepas, dan mahasiswa diberi notifikasi. Dokumen serta riwayat
  *   review tetap tersimpan. Admin kemudian memindahkan bimbingan ke dosen aktif lain.
  *   Hapus hanya untuk akun dosen yang belum pernah terlibat bimbingan (mis. akun salah ketik).
- * - Mahasiswa: Hapus permanen beserta seluruh bimbingan, dokumen, dan filenya.
+ * - Mahasiswa: Hapus permanen hanya untuk akun tanpa bimbingan; yang sudah selesai tetap tersimpan di Arsip.
  * Fungsi pembaca aman dipanggil sebelum migrasi dijalankan.
  */
 
@@ -140,12 +140,15 @@ function lecturer_delete(mysqli $db, int $lecturerId): string
     return $lecturer['nama_lengkap'];
 }
 
-/** Hapus permanen akun mahasiswa beserta seluruh bimbingan, dokumen, revisi, dan filenya. */
+/** Hapus permanen akun mahasiswa yang tidak memiliki bimbingan (akun ganda atau yang sudah dilepas). */
 function student_delete(mysqli $db, int $studentId): string
 {
     $stmt = $db->prepare("SELECT id,nama_lengkap FROM users WHERE id=? AND role='mahasiswa' LIMIT 1");
     $stmt->bind_param('i', $studentId);$stmt->execute();$student = $stmt->get_result()->fetch_assoc();$stmt->close();
     if (!$student) throw new RuntimeException('Mahasiswa tidak ditemukan.');
+    $stmt = $db->prepare('SELECT COUNT(*) FROM bimbingan WHERE mahasiswa_id=?');
+    $stmt->bind_param('i', $studentId);$stmt->execute();$guidanceTotal = (int)$stmt->get_result()->fetch_row()[0];$stmt->close();
+    if ($guidanceTotal > 0) throw new RuntimeException($student['nama_lengkap'] . ' masih memiliki bimbingan (aktif atau arsip) sehingga tidak dapat dihapus.');
     $files = [];
     $db->begin_transaction();
     try {
@@ -185,4 +188,87 @@ function student_delete(mysqli $db, int $studentId): string
     foreach (glob(dirname(__DIR__, 2) . '/storage/avatars/user-' . $studentId . '.*') ?: [] as $avatar) @unlink($avatar);
     error_log('MyThesis: akun mahasiswa #' . $studentId . ' (' . $student['nama_lengkap'] . ') dihapus beserta ' . count($ids ?? []) . ' bimbingan');
     return $student['nama_lengkap'];
+}
+
+// ---- Nama dosen: gelar depan, nama dasar, gelar belakang (migrasi 20261004_lecturer_name_parts.sql) ----
+
+function name_parts_ready(mysqli $db): bool
+{
+    return column_exists($db, 'users', 'nama_dasar');
+}
+
+/** Pecah nama lengkap menjadi [gelar_depan, nama_dasar, gelar_belakang]. Gelar belakang dimulai dari koma pertama. */
+function name_parse(string $full): array
+{
+    $full = trim(preg_replace('/\s+/', ' ', $full));
+    $back = '';
+    if (($comma = strpos($full, ',')) !== false) {
+        $back = trim(substr($full, $comma + 1));
+        $full = trim(substr($full, 0, $comma));
+    }
+    $tokens = $full === '' ? [] : explode(' ', $full);
+    $front = [];
+    while (count($tokens) > 1 && preg_match('/^(prof|dr|drs|dra|ir|h|hj|hi|kh|k\.h|apt|dokter|ns)\.?(\([a-z.]+\))?$/iu', $tokens[0])) $front[] = array_shift($tokens);
+    return [implode(' ', $front), implode(' ', $tokens), $back];
+}
+
+function name_compose(string $front, string $base, string $back): string
+{
+    return trim(trim($front) . ' ' . trim($base)) . (trim($back) !== '' ? ', ' . trim($back) : '');
+}
+
+/** Isi bagian nama dosen yang belum terisi dari nama lengkap yang sudah ada (aman dijalankan berulang). */
+function name_backfill(mysqli $db): void
+{
+    if (!name_parts_ready($db)) return;
+    $rows = $db->query("SELECT id,nama_lengkap FROM users WHERE role='dosen' AND nama_dasar IS NULL")->fetch_all(MYSQLI_ASSOC);
+    foreach ($rows as $row) name_sync_parts($db, (int)$row['id'], (string)$row['nama_lengkap']);
+}
+
+function name_sync_parts(mysqli $db, int $userId, string $full): void
+{
+    if (!name_parts_ready($db)) return;
+    [$front, $base, $back] = name_parse($full);
+    $stmt = $db->prepare('UPDATE users SET gelar_depan=?,nama_dasar=?,gelar_belakang=? WHERE id=?');
+    $stmt->bind_param('sssi', $front, $base, $back, $userId);$stmt->execute();$stmt->close();
+}
+
+/** Ekspresi ORDER BY nama dasar (tanpa gelar), jatuh ke nama lengkap bila belum terisi. */
+function lecturer_sort_sql(mysqli $db, string $alias = ''): string
+{
+    $prefix = $alias !== '' ? $alias . '.' : '';
+    return name_parts_ready($db) ? "COALESCE(NULLIF({$prefix}nama_dasar,''),{$prefix}nama_lengkap)" : $prefix . 'nama_lengkap';
+}
+
+/** Perbarui data dosen oleh admin. $data: gelar_depan, nama_dasar, gelar_belakang, username, email, no_telp, password (opsional). */
+function lecturer_update(mysqli $db, int $lecturerId, array $data): string
+{
+    useradmin_lecturer($db, $lecturerId);
+    $front = trim(preg_replace('/\s+/', ' ', (string)($data['gelar_depan'] ?? '')));
+    $base = trim(preg_replace('/\s+/', ' ', (string)($data['nama_dasar'] ?? '')));
+    $back = trim(preg_replace('/\s+/', ' ', (string)($data['gelar_belakang'] ?? '')));
+    $username = trim((string)($data['username'] ?? ''));
+    $email = trim((string)($data['email'] ?? ''));
+    $phone = trim((string)($data['no_telp'] ?? ''));
+    $password = (string)($data['password'] ?? '');
+    if (mb_strlen($base) < 2 || mb_strlen($base) > 100) throw new RuntimeException('Nama dosen (tanpa gelar) harus 2–100 karakter.');
+    if (mb_strlen($front) > 40 || mb_strlen($back) > 80) throw new RuntimeException('Gelar depan maksimal 40 karakter dan gelar belakang maksimal 80 karakter.');
+    $full = name_compose($front, $base, $back);
+    if (mb_strlen($full) > 150) throw new RuntimeException('Nama beserta gelar terlalu panjang (maksimal 150 karakter).');
+    if (!preg_match('/^[A-Za-z0-9._-]{4,100}$/', $username)) throw new RuntimeException('Username 4–100 karakter (huruf, angka, titik, garis bawah, atau strip).');
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 100) throw new RuntimeException('Alamat email tidak valid.');
+    if (mb_strlen($phone) > 15) throw new RuntimeException('Nomor telepon maksimal 15 karakter.');
+    if ($password !== '' && (strlen($password) < 8 || strlen($password) > 72)) throw new RuntimeException('Password baru harus 8–72 karakter.');
+    $stmt = $db->prepare('SELECT id FROM users WHERE (username=? OR email=?) AND id<>? LIMIT 1');
+    $stmt->bind_param('ssi', $username, $email, $lecturerId);$stmt->execute();$taken = $stmt->get_result()->num_rows > 0;$stmt->close();
+    if ($taken) throw new RuntimeException('Username atau email sudah digunakan akun lain.');
+    $sets = 'nama_lengkap=?,username=?,email=?,no_telp=?';$types = 'ssss';$values = [$full, $username, $email, $phone];
+    if (name_parts_ready($db)) {$sets .= ',gelar_depan=?,nama_dasar=?,gelar_belakang=?';$types .= 'sss';array_push($values, $front, $base, $back);}
+    if ($password !== '') {$sets .= ',password=?';$types .= 's';$values[] = password_hash($password, PASSWORD_DEFAULT);}
+    $types .= 'i';$values[] = $lecturerId;
+    $stmt = $db->prepare("UPDATE users SET $sets WHERE id=? AND role='dosen'");
+    $stmt->bind_param($types, ...$values);
+    if (!$stmt->execute()) {$stmt->close();throw new RuntimeException('Data dosen belum dapat disimpan.');}
+    $stmt->close();
+    return $full;
 }
