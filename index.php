@@ -63,6 +63,19 @@ function pull_flash(): ?array
     return $flash;
 }
 
+/**
+ * Siapkan pengiriman file: lepaskan kunci sesi (halaman lain milik pengguna yang sama tidak ikut menunggu selama unduhan
+ * berjalan) dan kosongkan buffer ob_start() agar file tidak ditampung utuh di memori PHP sebelum dikirim.
+ * $cacheable: hapus "Pragma: no-cache" dan Expires lampau dari session_start(); Chrome menganggapnya wajib minta ulang
+ * walaupun Cache-Control max-age sudah ada, sehingga foto diminta ulang di setiap halaman.
+ */
+function begin_file_response(bool $cacheable = false): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+    while (ob_get_level() > 0) ob_end_clean();
+    if ($cacheable) {header_remove('Pragma');header_remove('Expires');}
+}
+
 // Mengecek apakah migrasi periode akademik sudah dijalankan agar aplikasi tetap berjalan sebelum migrasi.
 function academic_ready(mysqli $conn): bool
 {
@@ -430,9 +443,15 @@ if (isset($_GET['action']) && $_GET['action'] === 'avatar') {
         exit('Foto profil belum tersedia.');
     }
 
+    begin_file_response(true);
+    // Alamat foto memuat ?v=waktu-ubah: bila cocok, foto boleh disimpan lama (alamat berubah setiap foto diganti)
+    $avatarVersion = (string)filemtime($avatarPath);
+    $etag = '"av' . $requestedUserId . '-' . $avatarVersion . '"';
+    header('Cache-Control: ' . ($isPublicLecturer ? 'public' : 'private') . ', ' . (($_GET['v'] ?? '') === $avatarVersion ? 'max-age=31536000, immutable' : 'max-age=3600'));
+    header('ETag: ' . $etag);
+    if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $etag) {http_response_code(304);exit;}
     header('Content-Type: ' . $avatarMime);
     header('Content-Length: ' . filesize($avatarPath));
-    header('Cache-Control: ' . ($isPublicLecturer ? 'public' : 'private') . ', max-age=3600');
     readfile($avatarPath);
     exit;
 }
@@ -445,7 +464,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'contoh') {
     $examplePath = realpath(__DIR__ . '/' . $example['file_path']);
     if (!$examplePath || strpos($examplePath, realpath(examples_dir()) ?: '/nonexistent') !== 0 || !is_file($examplePath)) {http_response_code(404);exit('File contoh tidak tersedia.');}
     $exampleName = trim(preg_replace('/[^A-Za-z0-9 _.-]+/', '', $example['judul'])) ?: 'contoh';
-    while (ob_get_level() > 0) ob_end_clean();
+    begin_file_response(true);
     header('Content-Type: application/pdf');
     header('Content-Length: ' . filesize($examplePath));
     header('Content-Disposition: ' . (isset($_GET['unduh']) ? 'attachment' : 'inline') . '; filename="' . $exampleName . '.pdf"');
@@ -488,6 +507,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
     $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
     $safeName = preg_replace('/[^A-Za-z0-9._-]+/', '-', $document['nama_bab']);
     $downloadName = trim($safeName, '-') . '-v' . (int)$document['versi'] . '.' . $extension;
+    begin_file_response();
     header('Content-Type: application/octet-stream');
     header('Content-Length: ' . filesize($filePath));
     header('Content-Disposition: attachment; filename="' . $downloadName . '"');
@@ -510,6 +530,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_revision') {
     $revisionExtension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
     $revisionMimes = ['doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'pdf' => 'application/pdf'];
     if (!isset($revisionMimes[$revisionExtension])) $revisionExtension = 'docx';
+    begin_file_response();
     header('Content-Type: ' . $revisionMimes[$revisionExtension]);
     header('Content-Length: ' . filesize($filePath));
     header('Content-Disposition: attachment; filename="Revisi-' . $safeName . '-v' . (int)$revision['versi'] . '.' . $revisionExtension . '"');
@@ -523,7 +544,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_backup') {
     $backupPath = backup_file_path((string)($_GET['file'] ?? ''));
     if (!$backupPath) {http_response_code(404);exit('File backup tidak ditemukan.');}
     error_log('MyThesis: backup ' . basename($backupPath) . ' diunduh oleh admin #' . (int)$_SESSION['user']['id'] . ' dari ' . (string)($_SERVER['REMOTE_ADDR'] ?? '-'));
-    while (ob_get_level() > 0) ob_end_clean();
+    begin_file_response();
     header('Content-Type: application/gzip');
     header('Content-Length: ' . filesize($backupPath));
     header('Content-Disposition: attachment; filename="' . basename($backupPath) . '"');
