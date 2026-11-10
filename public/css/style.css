@@ -127,3 +127,5 @@
 .list-tabs{overflow-x:auto;scrollbar-width:thin}
 .list-tabs a{flex:0 0 auto;white-space:nowrap}
 .tab-pending{width:8px;height:8px;margin-left:-3px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px var(--surface)}
+@media(max-width:620px){.progress-steps .step:nth-child(9)::before{display:none}}
+.field-help[hidden]{display:none}

@@ -56,14 +56,16 @@ function p2_first_id(mysqli $db, int $bid): int {
     foreach(p2_team($db,$bid) as $teacher)if((int)$teacher['urutan']===1)return (int)$teacher['id'];
     return 0;
 }
-/** Versi terakhir tiap dokumen: ['bab' => [1..5 => baris|null], 'naskah' => baris|null]. */
+/** Versi terakhir tiap dokumen: ['bab' => [1..5 => baris|null], 'naskah'|'proposal'|'skripsi'|'final' => baris|null]. */
 function p2_latest_documents(mysqli $db, int $bid): array {
     if(isset($GLOBALS['p2LatestCache'][$bid]))return $GLOBALS['p2LatestCache'][$bid];
-    $latest=['bab'=>array_fill(1,5,null),'naskah'=>null,'proposal'=>null];
+    $latest=['bab'=>array_fill(1,5,null),'naskah'=>null,'proposal'=>null,'skripsi'=>null,'final'=>null];
     $result=$db->query("SELECT id,nama_bab,versi,status FROM bab_skripsi WHERE bimbingan_id=$bid ORDER BY versi,id");
     while($result && ($row=$result->fetch_assoc())){
         if(p2_is_format_doc((string)$row['nama_bab']))$latest['naskah']=$row;
         elseif(proposal_is_doc((string)$row['nama_bab']))$latest['proposal']=$row;
+        elseif(skripsi_is_doc((string)$row['nama_bab']))$latest['skripsi']=$row;
+        elseif(skripsi_is_pdf_doc((string)$row['nama_bab']))$latest['final']=$row;
         elseif($number=chapter_number((string)$row['nama_bab']))$latest['bab'][$number]=$row;
     }
     return $GLOBALS['p2LatestCache'][$bid]=$latest;

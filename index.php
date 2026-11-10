@@ -18,6 +18,7 @@ require_once __DIR__ . '/src/helpers/MeetingLog.php';
 require_once __DIR__ . '/src/helpers/Backup.php';
 require_once __DIR__ . '/src/helpers/StudentApproval.php';
 require_once __DIR__ . '/src/helpers/Proposal.php';
+require_once __DIR__ . '/src/helpers/Skripsi.php';
 require_once __DIR__ . '/src/helpers/Examples.php';
 require_once __DIR__ . '/src/helpers/UserAdmin.php';
 
@@ -267,11 +268,11 @@ function chapter_progress_map(mysqli $conn, array $guidanceIds): array
 }
 
 /**
- * Langkah progres skripsi: Judul, Bab 1–3, Proposal (bila tahap proposal aktif), Bab 4–5.
+ * Langkah progres skripsi: Judul, Bab 1–3, Proposal (bila tahap proposal aktif), Bab 4–5, Skripsi lengkap, PDF final.
  * Status tiap langkah: selesai | review | revisi | terbuka (giliran berikutnya) | terkunci.
  * $proposalStage berasal dari proposal_stage(); null = tahap proposal tidak ditampilkan.
  */
-function thesis_progress_steps(array $guidance, array $chapters, ?array $proposalStage = null): array
+function thesis_progress_steps(array $guidance, array $chapters, ?array $proposalStage = null, ?array $skripsiStage = null): array
 {
     $titleStatus = (string)$guidance['status'];
     $steps = [['label' => 'Judul', 'marker' => 'J', 'bab' => false, 'status' => $titleStatus === 'pengajuan_judul' ? 'review' : ($titleStatus === 'revisi_judul' ? 'revisi' : 'selesai'), 'versi' => 0]];
@@ -290,6 +291,14 @@ function thesis_progress_steps(array $guidance, array $chapters, ?array $proposa
         $state = !$row ? ($open ? 'terbuka' : 'terkunci') : ['disetujui' => 'selesai', 'menunggu_review' => 'review', 'direvisi' => 'revisi'][$row['status']] ?? 'review';
         if (!$row || $state !== 'selesai') $open = false;
         $steps[] = ['label' => 'Bab ' . $number, 'marker' => (string)$number, 'bab' => true, 'status' => $state, 'versi' => $row ? (int)$row['versi'] : 0];
+    }
+    // Skripsi lengkap (draf Word, direview Pembimbing 1) lalu PDF final, setelah Bab 5 disetujui.
+    if ($skripsiStage !== null) {
+        $stage = $skripsiStage['tahap'];
+        $draftStatus = ['terbuka' => 'terbuka', 'review' => 'review', 'revisi' => 'revisi', 'pdf' => 'selesai', 'selesai' => 'selesai'][$stage] ?? 'terkunci';
+        if (!$open && $draftStatus === 'terbuka') $draftStatus = 'terkunci';
+        $steps[] = ['label' => 'Skripsi', 'marker' => 'S', 'bab' => false, 'status' => $draftStatus, 'versi' => (int)$skripsiStage['versi'], 'keterangan' => in_array($draftStatus, ['terkunci', 'selesai'], true) ? null : $skripsiStage['keterangan']];
+        $steps[] = ['label' => 'PDF Final', 'marker' => 'F', 'bab' => false, 'status' => $stage === 'selesai' ? 'selesai' : ($stage === 'pdf' ? 'terbuka' : 'terkunci'), 'versi' => (int)($skripsiStage['versi_pdf'] ?? 0), 'keterangan' => $stage === 'selesai' ? 'Diunggah' : null];
     }
     return $steps;
 }
@@ -348,7 +357,7 @@ function prodi_label(array $row, string $nameKey = 'nama', string $levelKey = 'j
 
 $page = isset($_GET['page']) ? (string)$_GET['page'] : 'home';
 $allowedPages = ['home', 'login', 'register', 'dashboard', 'pemeriksaan', 'forgot-password', 'reset-password', 'notifikasi'];
-const APP_VERSION = '1.14.0';
+const APP_VERSION = '1.15.0';
 
 // Pratinjau akun mahasiswa oleh admin/dosen: harus berjalan sebelum semua aksi dan halaman lain.
 require __DIR__ . '/src/helpers/StudentPreview.php';
