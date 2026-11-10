@@ -39,6 +39,8 @@ File `database.local.php` telah diabaikan oleh Git dan tidak boleh dikirim ke re
 
 Pastikan folder `storage/uploads` tersedia dan dapat ditulis oleh PHP. Mulai dengan permission `750`; gunakan `755` hanya jika konfigurasi hosting memerlukannya.
 
+Batas ukuran unggah: bab dan proposal maksimal 10 MB, sedangkan skripsi lengkap (draf Word, file revisinya, dan PDF final) maksimal 20 MB. Atur PHP agar menerimanya: cPanel → **MultiPHP INI Editor** → pilih domain → `upload_max_filesize = 20M`, `post_max_size = 25M`, lalu Apply. Hasilnya dapat dicek di halaman Pemeriksaan Sistem.
+
 ## 4. Uji aplikasi
 
 1. Buka halaman beranda dan pendaftaran.
