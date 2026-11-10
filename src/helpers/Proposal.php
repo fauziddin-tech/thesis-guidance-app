@@ -167,6 +167,8 @@ function proposal_unmark_seminar(mysqli $db, int $lecturerId, int $guidanceId): 
  * - Pembimbing 1 menilai setiap komponen (Sesuai / Perlu perbaikan) sebelum menyetujui; proposal
  *   hanya dapat disetujui bila semua komponen Sesuai. Komponen yang perlu diperbaiki ikut tertulis
  *   di catatan revisi.
+ * Daftar periksa yang sama dipakai untuk draf skripsi lengkap (src/helpers/Skripsi.php); fungsi di
+ * bawah menerima daftar komponen lain lewat parameter $components.
  * ------------------------------------------------------------------------------------------- */
 const PROPOSAL_COMPONENTS = [
     'cover' => 'Cover (halaman judul)',
@@ -194,20 +196,10 @@ function proposal_checklist_ready(mysqli $db): bool
     return $ready;
 }
 
-/** Memindai judul bagian di file DOCX. Hasil: [komponen => true|false|null]; null = tidak dapat diperiksa otomatis. */
+/** Memindai judul bagian di file DOCX proposal. Hasil: [komponen => true|false|null]; null = tidak dapat diperiksa otomatis. */
 function proposal_scan_docx(string $path): array
 {
-    $result = array_fill_keys(array_keys(PROPOSAL_COMPONENTS), null);
-    if (!class_exists('ZipArchive')) return $result;
-    $zip = new ZipArchive();
-    if ($zip->open($path) !== true) return $result;
-    $xml = (string)$zip->getFromName('word/document.xml');
-    $zip->close();
-    if ($xml === '') return $result;
-    $text = preg_replace(['/<\/w:p>/', '/<w:tab\/>/', '/<[^>]+>/'], ["\n", ' ', ''], $xml);
-    $text = mb_strtoupper(html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8'));
-    $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
-    $patterns = [
+    return checklist_scan_docx($path, PROPOSAL_COMPONENTS, [
         'kata_pengantar' => '/KATA\s+PENGANTAR/u',
         'daftar_isi' => '/DAFTAR\s+ISI/u',
         'daftar_tabel' => '/DAFTAR\s+TABEL/u',
@@ -217,9 +209,24 @@ function proposal_scan_docx(string $path): array
         'bab3' => '/\bBAB\s+(III|3)\b/u',
         'daftar_pustaka' => '/DAFTAR\s+PUSTAKA|DAFTAR\s+REFERENSI|DAFTAR\s+RUJUKAN|BIBLIOGRAFI/u',
         'lampiran' => '/\bLAMPIRAN\b/u',
-    ];
-    foreach ($patterns as $key => $pattern) $result[$key] = preg_match($pattern, $text) === 1;
-    return $result; // cover tidak dapat dikenali otomatis (tetap null)
+    ]);
+}
+
+/** Pemindai umum: komponen tanpa pola (mis. cover) tetap null. */
+function checklist_scan_docx(string $path, array $components, array $patterns): array
+{
+    $result = array_fill_keys(array_keys($components), null);
+    if (!class_exists('ZipArchive')) return $result;
+    $zip = new ZipArchive();
+    if ($zip->open($path) !== true) return $result;
+    $xml = (string)$zip->getFromName('word/document.xml');
+    $zip->close();
+    if ($xml === '') return $result;
+    $text = preg_replace(['/<\/w:p>/', '/<w:tab\/>/', '/<[^>]+>/'], ["\n", ' ', ''], $xml);
+    $text = mb_strtoupper(html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8'));
+    $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
+    foreach ($patterns as $key => $pattern) if (array_key_exists($key, $result)) $result[$key] = preg_match($pattern, $text) === 1;
+    return $result;
 }
 
 function proposal_checklist_get(mysqli $db, int $documentId): array
@@ -245,29 +252,29 @@ function proposal_checklist_put(mysqli $db, int $documentId, array $data): void
 }
 
 /** Komponen yang belum dicentang mahasiswa. */
-function proposal_missing_student_ticks(array $ticked): array
+function proposal_missing_student_ticks(array $ticked, ?array $components = null): array
 {
-    return array_values(array_diff(array_keys(PROPOSAL_COMPONENTS), $ticked));
+    return array_values(array_diff(array_keys($components ?? PROPOSAL_COMPONENTS), $ticked));
 }
 
 /** Label komponen dengan hasil pemeriksaan dosen tertentu. */
-function proposal_components_with(array $checklist, string $result): array
+function proposal_components_with(array $checklist, string $result, ?array $components = null): array
 {
     $labels = [];
-    foreach (PROPOSAL_COMPONENTS as $key => $label) if (($checklist['dosen']['hasil'][$key] ?? '') === $result) $labels[] = $label;
+    foreach ($components ?? PROPOSAL_COMPONENTS as $key => $label) if (($checklist['dosen']['hasil'][$key] ?? '') === $result) $labels[] = $label;
     return $labels;
 }
 
 /** Komponen yang tidak ditemukan pemindaian otomatis. */
-function proposal_components_not_found(array $checklist): array
+function proposal_components_not_found(array $checklist, ?array $components = null): array
 {
     $labels = [];
-    foreach (PROPOSAL_COMPONENTS as $key => $label) if (($checklist['otomatis'][$key] ?? null) === false) $labels[] = $label;
+    foreach ($components ?? PROPOSAL_COMPONENTS as $key => $label) if (($checklist['otomatis'][$key] ?? null) === false) $labels[] = $label;
     return $labels;
 }
 
-function proposal_checklist_complete(array $checklist): bool
+function proposal_checklist_complete(array $checklist, ?array $components = null): bool
 {
-    foreach (array_keys(PROPOSAL_COMPONENTS) as $key) if (($checklist['dosen']['hasil'][$key] ?? '') !== 'sesuai') return false;
+    foreach (array_keys($components ?? PROPOSAL_COMPONENTS) as $key) if (($checklist['dosen']['hasil'][$key] ?? '') !== 'sesuai') return false;
     return true;
 }
