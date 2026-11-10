@@ -58,8 +58,8 @@ foreach ([
 }
 $uploadMax = ini_get('upload_max_filesize');
 $postMax = ini_get('post_max_size');
-$server[] = ['Batas unggah file', $toBytes($uploadMax) >= 10 * 1024 * 1024 ? 'ok' : 'fail', 'upload_max_filesize = ' . $uploadMax . ' (aplikasi menerima dokumen hingga 10 MB).'];
-$server[] = ['Batas ukuran formulir', $toBytes($postMax) >= 11 * 1024 * 1024 ? 'ok' : 'warn', 'post_max_size = ' . $postMax . ' (disarankan minimal 12M).'];
+$server[] = ['Batas unggah file', $toBytes($uploadMax) >= SKRIPSI_MAX_MB * 1024 * 1024 ? 'ok' : ($toBytes($uploadMax) >= UPLOAD_MAX_MB * 1024 * 1024 ? 'warn' : 'fail'), 'upload_max_filesize = ' . $uploadMax . ' (bab dan proposal hingga ' . UPLOAD_MAX_MB . ' MB; skripsi lengkap dan PDF final hingga ' . SKRIPSI_MAX_MB . ' MB, butuh minimal ' . SKRIPSI_MAX_MB . 'M).'];
+$server[] = ['Batas ukuran formulir', $toBytes($postMax) >= (SKRIPSI_MAX_MB + 1) * 1024 * 1024 ? 'ok' : 'warn', 'post_max_size = ' . $postMax . ' (disarankan minimal ' . (SKRIPSI_MAX_MB + 5) . 'M).'];
 $dbNowResult = $conn->query('SELECT NOW()');
 $dbNow = $dbNowResult ? (string)$dbNowResult->fetch_row()[0] : '';
 $clockGap = $dbNow !== '' ? abs(strtotime($dbNow) - time()) : 0;

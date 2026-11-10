@@ -13,6 +13,15 @@ const SKRIPSI_DOC = 'Skripsi Lengkap';
 const SKRIPSI_TARGET = 92; // kode target unggah untuk draf skripsi lengkap (Word)
 const SKRIPSI_PDF_DOC = 'Skripsi Final (PDF)';
 const SKRIPSI_PDF_TARGET = 93; // kode target unggah untuk versi akhir PDF
+// Batas ukuran file: skripsi lengkap (draf Word, file revisinya, dan PDF final) 20 MB; bab dan proposal tetap 10 MB.
+const UPLOAD_MAX_MB = 10;
+const SKRIPSI_MAX_MB = 20;
+
+/** Batas ukuran (MB) untuk dokumen dengan nama tertentu. */
+function upload_limit_mb(string $name): int
+{
+    return skripsi_is_doc($name) || skripsi_is_pdf_doc($name) ? SKRIPSI_MAX_MB : UPLOAD_MAX_MB;
+}
 
 const SKRIPSI_COMPONENTS = [
     'cover' => 'Cover (halaman judul)',
